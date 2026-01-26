@@ -69,7 +69,14 @@ app.post('/api/register', async (req, res) => {
   req.session.userId = result.userId;
   req.session.displayName = displayName;
 
-  res.json({ success: true, displayName });
+  // Explicitly save session before responding
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.status(500).json({ error: 'Session error' });
+    }
+    res.json({ success: true, displayName });
+  });
 });
 
 // Login
@@ -89,7 +96,14 @@ app.post('/api/login', async (req, res) => {
   req.session.userId = result.user.id;
   req.session.displayName = result.user.displayName;
 
-  res.json({ success: true, displayName: result.user.displayName });
+  // Explicitly save session before responding
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.status(500).json({ error: 'Session error' });
+    }
+    res.json({ success: true, displayName: result.user.displayName });
+  });
 });
 
 // Logout
