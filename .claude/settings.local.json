@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__hubble__track_get_records"
+    ]
+  }
+}

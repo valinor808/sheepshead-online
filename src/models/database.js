@@ -158,8 +158,13 @@ function run(sql, params = []) {
   try {
     db.run(sql, params);
     saveDb();
+    // Get last insert rowid using a prepared statement
+    const stmt = db.prepare("SELECT last_insert_rowid() as id");
+    stmt.step();
+    const result = stmt.getAsObject();
+    stmt.free();
     return {
-      lastInsertRowid: db.exec("SELECT last_insert_rowid()")[0]?.values[0]?.[0] || 0,
+      lastInsertRowid: result.id,
       changes: db.getRowsModified()
     };
   } catch (err) {

@@ -134,7 +134,8 @@ app.post('/api/logout', (req, res) => {
 // Get current user
 app.get('/api/me', (req, res) => {
   console.log('/api/me: Session check', { sessionID: req.sessionID, userId: req.session?.userId, cookies: req.headers.cookie });
-  if (!req.session.userId) {
+  // Check for undefined/null specifically, not falsy (0 is a valid userId)
+  if (req.session.userId === undefined || req.session.userId === null) {
     return res.status(401).json({ error: 'Not logged in' });
   }
 
@@ -170,7 +171,8 @@ const socketUsers = new Map();
 io.on('connection', (socket) => {
   const sess = socket.request.session;
 
-  if (!sess || !sess.userId) {
+  // Check for undefined/null specifically, not falsy (0 is a valid userId)
+  if (!sess || sess.userId === undefined || sess.userId === null) {
     socket.emit('error', { message: 'Not authenticated' });
     socket.disconnect();
     return;
