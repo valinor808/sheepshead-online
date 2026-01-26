@@ -89,6 +89,11 @@ class GameUI {
   }
 
   handleError(data) {
+    // Don't show alert for authentication errors - just log them
+    if (data.message === 'Not authenticated') {
+      console.log('Socket not authenticated, will retry on next action');
+      return;
+    }
     alert(data.message);
   }
 

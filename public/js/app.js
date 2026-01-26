@@ -113,11 +113,19 @@ async function showLobby(displayName, stats = null) {
     socket = null;
   }
 
-  // Small delay to ensure session is fully saved before connecting WebSocket
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Longer delay to ensure session is fully saved before connecting WebSocket
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   // Connect socket
   socket = io();
+
+  // Wait for socket to connect before creating GameUI
+  await new Promise((resolve) => {
+    socket.on('connect', resolve);
+    // Timeout after 5 seconds
+    setTimeout(resolve, 5000);
+  });
+
   gameUI = new GameUI(socket);
 
   // Load stats and rooms
