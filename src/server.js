@@ -14,7 +14,12 @@ const { PHASES } = require('./game/SheepsheadGame');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: true, // Allow same origin
+    credentials: true
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'sheepshead-secret-change-in-production';

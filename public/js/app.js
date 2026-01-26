@@ -11,7 +11,7 @@ const gameScreen = document.getElementById('game-screen');
 // Check if already logged in
 async function checkAuth() {
   try {
-    const res = await fetch('/api/me');
+    const res = await fetch('/api/me', { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       showLobby(data.user.displayName, data.stats);
@@ -42,7 +42,8 @@ document.getElementById('login-btn').addEventListener('click', async () => {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password }),
+      credentials: 'include'
     });
 
     const data = await res.json();
@@ -66,7 +67,8 @@ document.getElementById('register-btn').addEventListener('click', async () => {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, displayName })
+      body: JSON.stringify({ username, password, displayName }),
+      credentials: 'include'
     });
 
     const data = await res.json();
@@ -82,7 +84,7 @@ document.getElementById('register-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  await fetch('/api/logout', { method: 'POST', credentials: 'include' });
   if (socket) {
     socket.disconnect();
     socket = null;
@@ -116,8 +118,8 @@ async function showLobby(displayName, stats = null) {
   // Longer delay to ensure session is fully saved before connecting WebSocket
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Connect socket
-  socket = io();
+  // Connect socket with credentials
+  socket = io({ withCredentials: true });
 
   // Wait for socket to connect before creating GameUI
   await new Promise((resolve) => {
@@ -130,7 +132,7 @@ async function showLobby(displayName, stats = null) {
 
   // Load stats and rooms
   if (!stats) {
-    const res = await fetch('/api/me');
+    const res = await fetch('/api/me', { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
       stats = data.stats;
@@ -176,7 +178,7 @@ function renderStats(stats) {
 
 async function loadRooms() {
   try {
-    const res = await fetch('/api/rooms');
+    const res = await fetch('/api/rooms', { credentials: 'include' });
     const rooms = await res.json();
 
     const container = document.getElementById('room-list');
@@ -207,7 +209,7 @@ async function loadRooms() {
 
 async function loadLeaderboard() {
   try {
-    const res = await fetch('/api/leaderboard');
+    const res = await fetch('/api/leaderboard', { credentials: 'include' });
     const leaders = await res.json();
 
     const container = document.getElementById('leaderboard');
