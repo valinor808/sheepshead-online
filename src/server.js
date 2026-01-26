@@ -23,25 +23,28 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'sheepshead-secret-change-in-production';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+// Railway sets PORT, so if PORT is set we're likely in production
+const IS_PRODUCTION = process.env.PORT || process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+
+console.log('Environment:', { IS_PRODUCTION, PORT: process.env.PORT, NODE_ENV: process.env.NODE_ENV });
 
 // Trust proxy for Railway (needed for secure cookies behind reverse proxy)
-if (IS_PRODUCTION) {
-  app.set('trust proxy', 1);
-}
+// Always trust proxy since Railway uses a reverse proxy
+app.set('trust proxy', 1);
 
 // Session configuration with memory store
 const sessionMiddleware = session({
+  name: 'sheepshead.sid',
   store: new MemoryStore({
     checkPeriod: 86400000 // prune expired entries every 24h
   }),
   secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   cookie: {
     secure: IS_PRODUCTION, // Use secure cookies in production (HTTPS)
     httpOnly: true,
-    sameSite: 'lax', // 'lax' works for same-site requests
+    sameSite: IS_PRODUCTION ? 'none' : 'lax', // 'none' required for cross-site with secure
     maxAge: 7 * 24 * 60 * 60 * 1000 // 1 week
   }
 });
@@ -82,8 +85,11 @@ app.post('/api/register', async (req, res) => {
   req.session.userId = result.userId;
   req.session.displayName = displayName;
 
+  console.log('Register: Setting session', { userId: result.userId, sessionID: req.sessionID });
+
   // Explicitly save session before responding
   req.session.save((err) => {
+    console.log('Register: Session saved', { err, sessionID: req.sessionID });
     if (err) {
       console.error('Session save error:', err);
       return res.status(500).json({ error: 'Session error' });
@@ -127,6 +133,7 @@ app.post('/api/logout', (req, res) => {
 
 // Get current user
 app.get('/api/me', (req, res) => {
+  console.log('/api/me: Session check', { sessionID: req.sessionID, userId: req.session?.userId, cookies: req.headers.cookie });
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Not logged in' });
   }
