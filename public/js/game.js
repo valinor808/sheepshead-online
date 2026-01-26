@@ -74,7 +74,16 @@ class GameUI {
   handleRoomUpdate(data) {
     console.log('Room update:', data);
     if (this.state) {
-      // Update player list
+      // Update player list from room update
+      this.state.players = data.players.map(p => ({
+        ...p,
+        cardCount: 0,
+        isDealer: false,
+        isPicker: false,
+        isPartner: false,
+        tricksWon: 0
+      }));
+      this.state.phase = data.phase;
       this.render();
     }
   }
@@ -128,10 +137,12 @@ class GameUI {
 
     // Update player count display
     const countEl = document.getElementById('waiting-count');
-    countEl.textContent = this.state.players.length + ' / 5 players';
+    const playerCount = this.state.players ? this.state.players.length : 0;
+    countEl.textContent = playerCount + ' / 5 players';
 
+    const players = this.state.players || [];
     for (let i = 0; i < 5; i++) {
-      const player = this.state.players.find(p => p.seatIndex === i);
+      const player = players.find(p => p.seatIndex === i);
       const div = document.createElement('div');
       div.className = 'waiting-player' + (player ? '' : ' empty');
       div.textContent = player ? player.name : 'Waiting...';
@@ -140,7 +151,7 @@ class GameUI {
 
     // Show start button if we have 5 players
     const startBtn = document.getElementById('start-game-btn');
-    if (this.state.players.length === 5) {
+    if (players.length === 5) {
       startBtn.classList.remove('hidden');
     } else {
       startBtn.classList.add('hidden');

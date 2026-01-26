@@ -107,11 +107,18 @@ async function showLobby(displayName, stats = null) {
 
   document.getElementById('user-display-name').textContent = displayName;
 
-  // Connect socket if not connected
-  if (!socket) {
-    socket = io();
-    gameUI = new GameUI(socket);
+  // Disconnect old socket if exists
+  if (socket) {
+    socket.disconnect();
+    socket = null;
   }
+
+  // Small delay to ensure session is fully saved before connecting WebSocket
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  // Connect socket
+  socket = io();
+  gameUI = new GameUI(socket);
 
   // Load stats and rooms
   if (!stats) {
