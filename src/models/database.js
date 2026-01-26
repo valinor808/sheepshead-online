@@ -156,16 +156,31 @@ function queryOne(sql, params = []) {
 function run(sql, params = []) {
   if (!db) throw new Error('Database not initialized');
   try {
-    db.run(sql, params);
-    saveDb();
-    // Get last insert rowid using a prepared statement
-    const stmt = db.prepare("SELECT last_insert_rowid() as id");
+    // Use prepared statement for proper parameter binding in sql.js
+    const stmt = db.prepare(sql);
+    if (params.length > 0) {
+      stmt.bind(params);
+    }
     stmt.step();
-    const result = stmt.getAsObject();
     stmt.free();
+
+    // Get last insert rowid
+    const idStmt = db.prepare("SELECT last_insert_rowid() as id");
+    idStmt.step();
+    const result = idStmt.getAsObject();
+    idStmt.free();
+
+    const lastId = result.id;
+    const changes = db.getRowsModified();
+
+    // Now save
+    saveDb();
+
+    console.log('DB run result:', { sql: sql.substring(0, 50), lastId, changes });
+
     return {
-      lastInsertRowid: result.id,
-      changes: db.getRowsModified()
+      lastInsertRowid: lastId,
+      changes: changes
     };
   } catch (err) {
     console.error('Run error:', sql, err.message);

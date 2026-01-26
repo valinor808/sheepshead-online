@@ -140,6 +140,12 @@ app.get('/api/me', (req, res) => {
   }
 
   const user = User.getById(req.session.userId);
+
+  if (!user) {
+    console.log('/api/me: User not found for userId:', req.session.userId);
+    return res.status(401).json({ error: 'User not found' });
+  }
+
   const stats = User.getStats(req.session.userId);
 
   res.json({
