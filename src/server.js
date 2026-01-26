@@ -4,9 +4,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+const MemoryStore = require('memorystore')(session);
 const path = require('path');
 
+const db = require('./models/database');
 const User = require('./models/User');
 const roomManager = require('./game/RoomManager');
 const { PHASES } = require('./game/SheepsheadGame');
@@ -18,17 +19,16 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'sheepshead-secret-change-in-production';
 
-// Session configuration
+// Session configuration with memory store
 const sessionMiddleware = session({
-  store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: path.join(__dirname, '../data')
+  store: new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
   }),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     maxAge: 7 * 24 * 60 * 60 * 1000 // 1 week
   }
 });
@@ -66,7 +66,6 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: result.error });
   }
 
-  // Auto-login after registration
   req.session.userId = result.userId;
   req.session.displayName = displayName;
 
@@ -132,30 +131,27 @@ app.get('/api/rooms', (req, res) => {
 
 // ============== Socket.IO ==============
 
-// Map socket ID to user info
 const socketUsers = new Map();
 
 io.on('connection', (socket) => {
-  const session = socket.request.session;
+  const sess = socket.request.session;
 
-  if (!session || !session.userId) {
+  if (!sess || !sess.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     socket.disconnect();
     return;
   }
 
-  const userId = session.userId;
-  const displayName = session.displayName;
+  const oderId = sess.userId;
+  const displayName = sess.displayName;
 
-  socketUsers.set(socket.id, { oderId: `user_${userId}`, displayName, dbId: userId });
+  socketUsers.set(socket.id, { oderId: 'user_' + oderId, displayName, dbId: oderId });
 
-  console.log(`User connected: ${displayName} (${userId})`);
+  console.log('User connected: ' + displayName);
 
-  // Join a room
   socket.on('joinRoom', (roomId) => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
 
-    // Leave previous room socket
     const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
     currentRooms.forEach(r => socket.leave(r));
 
@@ -172,20 +168,14 @@ io.on('connection', (socket) => {
     socket.emit('gameState', game.getStateForPlayer(playerId));
     socket.to(roomId).emit('playerJoined', { playerId, displayName, seatIndex: result.seatIndex });
 
-    // Broadcast updated player list
     io.to(roomId).emit('roomUpdate', {
-      players: game.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        seatIndex: p.seatIndex
-      })),
+      players: game.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
       phase: game.phase
     });
   });
 
-  // Leave room
   socket.on('leaveRoom', () => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (game) {
@@ -194,24 +184,18 @@ io.on('connection', (socket) => {
       socket.leave(roomId);
       socket.to(roomId).emit('playerLeft', { playerId, displayName });
 
-      // Broadcast updated state if game still exists
       const updatedGame = roomManager.getRoom(roomId);
       if (updatedGame) {
         io.to(roomId).emit('roomUpdate', {
-          players: updatedGame.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            seatIndex: p.seatIndex
-          })),
+          players: updatedGame.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
           phase: updatedGame.phase
         });
       }
     }
   });
 
-  // Start game
   socket.on('startGame', () => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -226,7 +210,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Send each player their own state
     for (const player of game.players) {
       const playerSocket = findSocketByPlayerId(player.id);
       if (playerSocket) {
@@ -235,9 +218,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Pick or pass
   socket.on('pick', (wantsToPick) => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -252,13 +234,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Broadcast updated state
     broadcastGameState(game);
   });
 
-  // Bury cards
   socket.on('bury', (cardIds) => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -276,9 +256,8 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
-  // Call ace
-  socket.on('callAce', ({ suit, goAlone }) => {
-    const playerId = `user_${userId}`;
+  socket.on('callAce', (data) => {
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -286,7 +265,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const result = game.callAce(playerId, suit, goAlone);
+    const result = game.callAce(playerId, data.suit, data.goAlone);
 
     if (!result.success) {
       socket.emit('error', { message: result.error });
@@ -296,9 +275,8 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
-  // Play a card
   socket.on('playCard', (cardId) => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -313,7 +291,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Broadcast the card played
     io.to(game.roomId).emit('cardPlayed', {
       playerId,
       card: result.card,
@@ -328,20 +305,16 @@ io.on('connection', (socket) => {
       });
 
       if (result.handComplete) {
-        // Update stats for all players
         updatePlayerStats(game, result.results);
-
         io.to(game.roomId).emit('handComplete', result.results);
       }
     }
 
-    // Send updated state to each player
     broadcastGameState(game);
   });
 
-  // New hand (after scoring)
   socket.on('newHand', () => {
-    const playerId = `user_${userId}`;
+    const playerId = 'user_' + oderId;
     const game = roomManager.getPlayerRoom(playerId);
 
     if (!game) {
@@ -364,27 +337,20 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
-  // Disconnect
   socket.on('disconnect', () => {
-    const playerId = `user_${userId}`;
-    console.log(`User disconnected: ${displayName}`);
-
-    // Note: We don't automatically remove from game on disconnect
-    // This allows reconnection. Room cleanup happens when players explicitly leave.
+    console.log('User disconnected: ' + displayName);
     socketUsers.delete(socket.id);
   });
 
-  // Helper: Find socket by player ID
   function findSocketByPlayerId(playerId) {
     for (const [socketId, userInfo] of socketUsers) {
-      if (`user_${userInfo.dbId}` === playerId) {
+      if ('user_' + userInfo.dbId === playerId) {
         return io.sockets.sockets.get(socketId);
       }
     }
     return null;
   }
 
-  // Helper: Broadcast game state to all players
   function broadcastGameState(game) {
     for (const player of game.players) {
       const playerSocket = findSocketByPlayerId(player.id);
@@ -394,19 +360,16 @@ io.on('connection', (socket) => {
     }
   }
 
-  // Helper: Update player stats after hand
   function updatePlayerStats(game, results) {
     for (const player of game.players) {
-      // Extract numeric user ID from player ID
       const dbUserId = parseInt(player.id.replace('user_', ''));
-
       const scoreChange = results.scores[player.id] || 0;
 
       const handResult = {
         wasPicker: player.id === results.picker,
         wonAsPicker: player.id === results.picker && results.pickersWin,
         wonAsPartner: player.id === results.partner && results.pickersWin,
-        wonAsDefender: results.defendingTeam?.includes(player.id) && !results.pickersWin,
+        wonAsDefender: results.defendingTeam && results.defendingTeam.includes(player.id) && !results.pickersWin,
         isSchwanzer: results.type === 'schwanzer',
         wonSchwanzer: results.type === 'schwanzer' && player.id === results.winner,
         scoreChange,
@@ -419,7 +382,19 @@ io.on('connection', (socket) => {
   }
 });
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`Sheepshead server running on port ${PORT}`);
-});
+// Initialize database and start server
+async function start() {
+  try {
+    await db.initDb();
+    console.log('Database initialized');
+
+    server.listen(PORT, () => {
+      console.log('Sheepshead server running on port ' + PORT);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+start();

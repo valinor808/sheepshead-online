@@ -1,7 +1,7 @@
 // User model for authentication and stats
 
 const db = require('./database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const SALT_ROUNDS = 10;
 
@@ -13,21 +13,24 @@ class User {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     try {
-      const stmt = db.prepare(`
-        INSERT INTO users (username, password_hash, display_name)
-        VALUES (?, ?, ?)
-      `);
-      const result = stmt.run(username.toLowerCase(), passwordHash, displayName);
+      // Check if username exists
+      const existing = db.queryOne('SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
+      if (existing) {
+        return { success: false, error: 'Username already taken' };
+      }
+
+      const result = db.run(
+        'INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)',
+        [username.toLowerCase(), passwordHash, displayName]
+      );
 
       // Create initial stats record
-      db.prepare(`INSERT INTO player_stats (user_id) VALUES (?)`).run(result.lastInsertRowid);
+      db.run('INSERT INTO player_stats (user_id) VALUES (?)', [result.lastInsertRowid]);
 
       return { success: true, userId: result.lastInsertRowid };
     } catch (err) {
-      if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-        return { success: false, error: 'Username already taken' };
-      }
-      throw err;
+      console.error('Create user error:', err);
+      return { success: false, error: 'Failed to create user' };
     }
   }
 
@@ -35,10 +38,10 @@ class User {
    * Authenticate a user
    */
   static async authenticate(username, password) {
-    const user = db.prepare(`
-      SELECT id, username, password_hash, display_name
-      FROM users WHERE username = ?
-    `).get(username.toLowerCase());
+    const user = db.queryOne(
+      'SELECT id, username, password_hash, display_name FROM users WHERE username = ?',
+      [username.toLowerCase()]
+    );
 
     if (!user) {
       return { success: false, error: 'Invalid username or password' };
@@ -50,7 +53,7 @@ class User {
     }
 
     // Update last login
-    db.prepare(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`).run(user.id);
+    db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
 
     return {
       success: true,
@@ -66,19 +69,24 @@ class User {
    * Get user by ID
    */
   static getById(id) {
-    return db.prepare(`
-      SELECT id, username, display_name as displayName, created_at as createdAt
-      FROM users WHERE id = ?
-    `).get(id);
+    const user = db.queryOne(
+      'SELECT id, username, display_name, created_at FROM users WHERE id = ?',
+      [id]
+    );
+    if (!user) return null;
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      createdAt: user.created_at
+    };
   }
 
   /**
    * Get user stats
    */
   static getStats(userId) {
-    const stats = db.prepare(`
-      SELECT * FROM player_stats WHERE user_id = ?
-    `).get(userId);
+    const stats = db.queryOne('SELECT * FROM player_stats WHERE user_id = ?', [userId]);
 
     if (!stats) return null;
 
@@ -117,7 +125,7 @@ class User {
    * Update stats after a hand
    */
   static updateStats(userId, handResult) {
-    const stmt = db.prepare(`
+    db.run(`
       UPDATE player_stats SET
         hands_played = hands_played + 1,
         hands_picked = hands_picked + ?,
@@ -130,9 +138,7 @@ class User {
         schneiders_achieved = schneiders_achieved + ?,
         schwarz_achieved = schwarz_achieved + ?
       WHERE user_id = ?
-    `);
-
-    stmt.run(
+    `, [
       handResult.wasPicker ? 1 : 0,
       handResult.wonAsPicker ? 1 : 0,
       handResult.wonAsPartner ? 1 : 0,
@@ -143,14 +149,14 @@ class User {
       handResult.schneider ? 1 : 0,
       handResult.schwarz ? 1 : 0,
       userId
-    );
+    ]);
   }
 
   /**
    * Get leaderboard
    */
   static getLeaderboard(limit = 10) {
-    return db.prepare(`
+    return db.query(`
       SELECT
         u.display_name as displayName,
         u.username,
@@ -162,7 +168,7 @@ class User {
       WHERE ps.hands_played > 0
       ORDER BY ps.total_score DESC
       LIMIT ?
-    `).all(limit);
+    `, [limit]);
   }
 }
 
