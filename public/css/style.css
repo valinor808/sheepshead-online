@@ -662,3 +662,20 @@ body {
     font-size: 12px;
   }
 }
+
+.waiting-count {
+  font-size: 1.5rem;
+  color: var(--accent);
+  margin-bottom: 15px;
+}
+
+.waiting-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.btn.danger:hover {
+  background: #c82333;
+}

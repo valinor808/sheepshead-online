@@ -34,6 +34,11 @@ class GameUI {
       this.socket.emit('leaveRoom');
       this.showLobby();
     });
+
+    document.getElementById('cancel-room-btn').addEventListener('click', () => {
+      this.socket.emit('leaveRoom');
+      this.showLobby();
+    });
   }
 
   handleGameState(state) {
@@ -121,11 +126,15 @@ class GameUI {
     const container = document.getElementById('waiting-players');
     container.innerHTML = '';
 
+    // Update player count display
+    const countEl = document.getElementById('waiting-count');
+    countEl.textContent = this.state.players.length + ' / 5 players';
+
     for (let i = 0; i < 5; i++) {
       const player = this.state.players.find(p => p.seatIndex === i);
       const div = document.createElement('div');
       div.className = 'waiting-player' + (player ? '' : ' empty');
-      div.textContent = player ? player.name : `Seat ${i + 1} - Empty`;
+      div.textContent = player ? player.name : 'Waiting...';
       container.appendChild(div);
     }
 

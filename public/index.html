@@ -64,14 +64,12 @@
         <div class="lobby-section">
           <h2>Your Stats</h2>
           <div id="player-stats" class="stats-grid">
-            <!-- Populated by JS -->
           </div>
         </div>
 
         <div class="lobby-section">
           <h2>Leaderboard</h2>
           <div id="leaderboard" class="leaderboard">
-            <!-- Populated by JS -->
           </div>
         </div>
       </div>
@@ -86,29 +84,18 @@
       </header>
 
       <div class="game-table">
-        <!-- Other players around the table -->
         <div class="player-position top" id="player-pos-0"></div>
         <div class="player-position left" id="player-pos-1"></div>
         <div class="player-position right" id="player-pos-2"></div>
         <div class="player-position bottom-left" id="player-pos-3"></div>
         <div class="player-position bottom-right" id="player-pos-4"></div>
 
-        <!-- Center area for tricks and actions -->
         <div class="table-center">
-          <div id="trick-area" class="trick-area">
-            <!-- Cards played in current trick -->
-          </div>
-
-          <div id="action-area" class="action-area hidden">
-            <!-- Pick/pass, bury, call buttons -->
-          </div>
-
-          <div id="blind-area" class="blind-area hidden">
-            <!-- Blind cards when picking -->
-          </div>
+          <div id="trick-area" class="trick-area"></div>
+          <div id="action-area" class="action-area hidden"></div>
+          <div id="blind-area" class="blind-area hidden"></div>
         </div>
 
-        <!-- Info display -->
         <div id="game-info" class="game-info">
           <div id="picker-info"></div>
           <div id="called-suit-info"></div>
@@ -116,11 +103,8 @@
         </div>
       </div>
 
-      <!-- Player's hand -->
       <div class="player-hand-area">
-        <div id="player-hand" class="player-hand">
-          <!-- Player's cards -->
-        </div>
+        <div id="player-hand" class="player-hand"></div>
       </div>
 
       <!-- Scoring overlay -->
@@ -137,8 +121,12 @@
       <div id="waiting-overlay" class="overlay">
         <div class="waiting-content">
           <h2>Waiting for Players</h2>
+          <p id="waiting-count" class="waiting-count">0 / 5 players</p>
           <div id="waiting-players"></div>
-          <button id="start-game-btn" class="btn primary hidden">Start Game</button>
+          <div class="waiting-buttons">
+            <button id="start-game-btn" class="btn primary hidden">Start Game</button>
+            <button id="cancel-room-btn" class="btn danger">Leave Room</button>
+          </div>
         </div>
       </div>
     </div>
