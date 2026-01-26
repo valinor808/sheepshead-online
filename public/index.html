@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheepshead Online</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen">
+      <div class="auth-container">
+        <h1>Sheepshead Online</h1>
+        <p class="subtitle">5-Player Card Game</p>
+
+        <div id="login-form" class="auth-form">
+          <h2>Login</h2>
+          <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+          <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+          <button id="login-btn" class="btn primary">Login</button>
+          <p class="switch-form">Don't have an account? <a href="#" id="show-register">Register</a></p>
+        </div>
+
+        <div id="register-form" class="auth-form hidden">
+          <h2>Register</h2>
+          <input type="text" id="register-username" placeholder="Username (3-20 chars)">
+          <input type="text" id="register-displayname" placeholder="Display Name">
+          <input type="password" id="register-password" placeholder="Password (6+ chars)">
+          <button id="register-btn" class="btn primary">Register</button>
+          <p class="switch-form">Already have an account? <a href="#" id="show-login">Login</a></p>
+        </div>
+
+        <div id="auth-error" class="error-message hidden"></div>
+      </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen hidden">
+      <header class="lobby-header">
+        <h1>Sheepshead</h1>
+        <div class="user-info">
+          <span id="user-display-name"></span>
+          <button id="logout-btn" class="btn small">Logout</button>
+        </div>
+      </header>
+
+      <div class="lobby-content">
+        <div class="lobby-section">
+          <h2>Join or Create Room</h2>
+          <div class="room-input">
+            <input type="text" id="room-code" placeholder="Room Code" maxlength="20">
+            <button id="join-room-btn" class="btn primary">Join Room</button>
+          </div>
+        </div>
+
+        <div class="lobby-section">
+          <h2>Active Rooms</h2>
+          <div id="room-list" class="room-list">
+            <p class="no-rooms">No active rooms</p>
+          </div>
+        </div>
+
+        <div class="lobby-section">
+          <h2>Your Stats</h2>
+          <div id="player-stats" class="stats-grid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="lobby-section">
+          <h2>Leaderboard</h2>
+          <div id="leaderboard" class="leaderboard">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen hidden">
+      <header class="game-header">
+        <button id="leave-room-btn" class="btn small">Leave</button>
+        <span id="room-name"></span>
+        <span id="game-phase"></span>
+      </header>
+
+      <div class="game-table">
+        <!-- Other players around the table -->
+        <div class="player-position top" id="player-pos-0"></div>
+        <div class="player-position left" id="player-pos-1"></div>
+        <div class="player-position right" id="player-pos-2"></div>
+        <div class="player-position bottom-left" id="player-pos-3"></div>
+        <div class="player-position bottom-right" id="player-pos-4"></div>
+
+        <!-- Center area for tricks and actions -->
+        <div class="table-center">
+          <div id="trick-area" class="trick-area">
+            <!-- Cards played in current trick -->
+          </div>
+
+          <div id="action-area" class="action-area hidden">
+            <!-- Pick/pass, bury, call buttons -->
+          </div>
+
+          <div id="blind-area" class="blind-area hidden">
+            <!-- Blind cards when picking -->
+          </div>
+        </div>
+
+        <!-- Info display -->
+        <div id="game-info" class="game-info">
+          <div id="picker-info"></div>
+          <div id="called-suit-info"></div>
+          <div id="trick-count"></div>
+        </div>
+      </div>
+
+      <!-- Player's hand -->
+      <div class="player-hand-area">
+        <div id="player-hand" class="player-hand">
+          <!-- Player's cards -->
+        </div>
+      </div>
+
+      <!-- Scoring overlay -->
+      <div id="scoring-overlay" class="overlay hidden">
+        <div class="scoring-content">
+          <h2 id="scoring-title"></h2>
+          <div id="scoring-details"></div>
+          <div id="scoring-scores"></div>
+          <button id="new-hand-btn" class="btn primary">Next Hand</button>
+        </div>
+      </div>
+
+      <!-- Waiting overlay -->
+      <div id="waiting-overlay" class="overlay">
+        <div class="waiting-content">
+          <h2>Waiting for Players</h2>
+          <div id="waiting-players"></div>
+          <button id="start-game-btn" class="btn primary hidden">Start Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/cards.js"></script>
+  <script src="/js/game.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
