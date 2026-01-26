@@ -186,15 +186,20 @@ async function loadRooms() {
       return;
     }
 
-    container.innerHTML = rooms.map(room => `
-      <div class="room-item">
-        <div class="room-info">
-          <span class="room-name">${room.roomId}</span>
-          <span class="room-players">${room.players.join(', ')} (${room.playerCount}/5)</span>
+    container.innerHTML = rooms.map(room => {
+      // Escape room ID for use in HTML attribute
+      const escapedRoomId = room.roomId.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const displayRoomId = room.roomId.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `
+        <div class="room-item">
+          <div class="room-info">
+            <span class="room-name">${displayRoomId}</span>
+            <span class="room-players">${room.players.join(', ')} (${room.playerCount}/5)</span>
+          </div>
+          <button class="btn small" onclick="joinRoom('${escapedRoomId}')">Join</button>
         </div>
-        <button class="btn small" onclick="joinRoom('${room.roomId}')">Join</button>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   } catch (err) {
     console.error('Failed to load rooms:', err);
   }
@@ -266,8 +271,8 @@ function joinRoom(roomId) {
   gameScreen.classList.remove('hidden');
 }
 
-// Refresh rooms periodically
-setInterval(loadRooms, 10000);
+// Refresh rooms periodically (every 3 seconds)
+setInterval(loadRooms, 3000);
 
 // Initialize
 checkAuth();

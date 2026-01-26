@@ -42,7 +42,8 @@ class GameUI {
   }
 
   handleGameState(state) {
-    console.log('Game state:', state);
+    console.log('Game state received:', state);
+    console.log('Players in state:', state?.players?.length, state?.players);
     this.state = state;
     this.selectedCards = [];
     this.render();
@@ -65,10 +66,33 @@ class GameUI {
 
   handlePlayerJoined(data) {
     console.log('Player joined:', data);
+    // Add player to state if we have state
+    if (this.state && this.state.players) {
+      // Check if player already exists
+      const exists = this.state.players.find(p => p.id === data.playerId);
+      if (!exists) {
+        this.state.players.push({
+          id: data.playerId,
+          name: data.displayName,
+          seatIndex: data.seatIndex,
+          cardCount: 0,
+          isDealer: false,
+          isPicker: false,
+          isPartner: false,
+          tricksWon: 0
+        });
+        this.render();
+      }
+    }
   }
 
   handlePlayerLeft(data) {
     console.log('Player left:', data);
+    // Remove player from state if we have state
+    if (this.state && this.state.players) {
+      this.state.players = this.state.players.filter(p => p.id !== data.playerId);
+      this.render();
+    }
   }
 
   handleRoomUpdate(data) {
@@ -143,6 +167,7 @@ class GameUI {
     // Update player count display
     const countEl = document.getElementById('waiting-count');
     const playerCount = this.state.players ? this.state.players.length : 0;
+    console.log('renderWaitingState: playerCount =', playerCount);
     countEl.textContent = playerCount + ' / 5 players';
 
     const players = this.state.players || [];
@@ -444,5 +469,9 @@ class GameUI {
     document.getElementById('game-screen').classList.add('hidden');
     document.getElementById('lobby-screen').classList.remove('hidden');
     this.state = null;
+    // Refresh room list when returning to lobby
+    if (typeof loadRooms === 'function') {
+      loadRooms();
+    }
   }
 }

@@ -24,13 +24,20 @@ class User {
         [username.toLowerCase(), passwordHash, displayName]
       );
 
-      // Create initial stats record
-      db.run('INSERT INTO player_stats (user_id) VALUES (?)', [result.lastInsertRowid]);
+      const userId = result.lastInsertRowid;
+      console.log('Created user with ID:', userId);
 
-      return { success: true, userId: result.lastInsertRowid };
+      // Create initial stats record
+      db.run('INSERT INTO player_stats (user_id) VALUES (?)', [userId]);
+
+      return { success: true, userId };
     } catch (err) {
-      console.error('Create user error:', err);
-      return { success: false, error: 'Failed to create user' };
+      console.error('Create user error:', err.message, err.stack);
+      // Check for unique constraint violation
+      if (err.message && err.message.includes('UNIQUE')) {
+        return { success: false, error: 'Username already taken' };
+      }
+      return { success: false, error: 'Failed to create user: ' + err.message };
     }
   }
 
