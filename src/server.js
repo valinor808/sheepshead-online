@@ -18,6 +18,12 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'sheepshead-secret-change-in-production';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+
+// Trust proxy for Railway (needed for secure cookies behind reverse proxy)
+if (IS_PRODUCTION) {
+  app.set('trust proxy', 1);
+}
 
 // Session configuration with memory store
 const sessionMiddleware = session({
@@ -28,7 +34,9 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: IS_PRODUCTION, // Use secure cookies in production (HTTPS)
+    httpOnly: true,
+    sameSite: 'lax', // 'lax' works for same-site requests
     maxAge: 7 * 24 * 60 * 60 * 1000 // 1 week
   }
 });
