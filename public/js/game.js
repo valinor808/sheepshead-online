@@ -1,4 +1,17 @@
-// Game state and rendering
+/**
+ * Game UI Controller
+ *
+ * Manages all in-game rendering and user interactions for Sheepshead.
+ * Handles socket events for real-time game state updates and player actions.
+ *
+ * Player Positioning:
+ * - Players are arranged in a pentagon with "me" at the bottom
+ * - Positions 0-4 wrap clockwise: bottom, lower-left, upper-left, upper-right, lower-right
+ *
+ * Dependencies:
+ * - cards.js (createCardElement, SUIT_SYMBOLS, etc.)
+ * - Socket.IO connection passed to constructor
+ */
 
 class GameUI {
   constructor(socket) {
@@ -47,7 +60,8 @@ class GameUI {
 
     document.getElementById('new-hand-btn').addEventListener('click', () => {
       this.socket.emit('newHand');
-      document.getElementById('scoring-overlay').classList.add('hidden');
+      // Don't hide scoring overlay - wait for server to confirm all players ready
+      // The overlay will be hidden when new game state is received
     });
 
     document.getElementById('leave-table-btn').addEventListener('click', () => {
@@ -66,34 +80,32 @@ class GameUI {
   }
 
   handleGameState(state) {
-    console.log('Game state received:', state);
-    console.log('Players in state:', state?.players?.length, state?.players);
     this.state = state;
     this.selectedCards = [];
     // Reset pending under call if we moved past calling phase
     if (state.phase !== 'calling') {
       this.pendingUnderCall = null;
     }
+    // Clear voting display when not in scoring phase
+    if (state.phase !== 'scoring') {
+      this.updateVotingDisplay([], []);
+    }
     this.render();
   }
 
   handleCardPlayed(data) {
     // Animation could go here
-    console.log('Card played:', data);
   }
 
   handleTrickComplete(data) {
-    console.log('Trick complete:', data);
     // Could show animation of trick being collected
   }
 
   handleHandComplete(results) {
-    console.log('Hand complete:', results);
     this.showScoringOverlay(results);
   }
 
   handlePlayerJoined(data) {
-    console.log('Player joined:', data);
     // Add player to state if we have state
     if (this.state && this.state.players) {
       // Check if player already exists
@@ -115,7 +127,6 @@ class GameUI {
   }
 
   handlePlayerLeft(data) {
-    console.log('Player left:', data);
     // Remove player from state if we have state
     if (this.state && this.state.players) {
       this.state.players = this.state.players.filter(p => p.id !== data.playerId);
@@ -124,7 +135,6 @@ class GameUI {
   }
 
   handleRoomUpdate(data) {
-    console.log('Room update:', data);
     if (this.state) {
       // Update player list from room update
       this.state.players = data.players.map(p => ({
@@ -150,31 +160,26 @@ class GameUI {
   }
 
   handleGameReset(data) {
-    console.log('Game reset:', data);
     alert(data.message);
     // Hide scoring overlay if visible
     document.getElementById('scoring-overlay').classList.add('hidden');
   }
 
   handlePlayerLeavingTable(data) {
-    console.log('Player leaving table:', data);
     // This is now handled by votingUpdate
   }
 
   handleVotingUpdate(data) {
-    console.log('Voting update:', data);
     // Update the voting display in the scoring overlay
     this.updateVotingDisplay(data.playersNextHand, data.playersLeaving);
   }
 
   handleReturnToLobby(data) {
-    console.log('Return to lobby:', data);
     document.getElementById('scoring-overlay').classList.add('hidden');
     this.showLobby();
   }
 
   handleSessionEnded(data) {
-    console.log('Session ended:', data);
     document.getElementById('scoring-overlay').classList.add('hidden');
     // State will be updated by gameState event
   }
@@ -272,7 +277,6 @@ class GameUI {
     // Update player count display
     const countEl = document.getElementById('waiting-count');
     const playerCount = this.state.players ? this.state.players.length : 0;
-    console.log('renderWaitingState: playerCount =', playerCount);
     countEl.textContent = playerCount + ' / 5 players';
 
     const players = this.state.players || [];
@@ -304,9 +308,10 @@ class GameUI {
   renderPlayers() {
     // Map seat indices to position elements
     // My seat is always at the bottom (position 0)
-    // Other players wrap around clockwise: 8oclock, 10:30, 12oclock, 1:30
+    // Other players wrap around clockwise in pentagon formation
 
     const myIndex = this.state.myIndex;
+    const playerScores = this.state.playerScores || {};
 
     // Clear all positions
     for (let i = 0; i < 5; i++) {
@@ -320,7 +325,7 @@ class GameUI {
       let relPos = (player.seatIndex - myIndex + 5) % 5;
 
       // Map relative position to visual position
-      // 0 = bottom (me), 1 = 8oclock, 2 = 10:30, 3 = top, 4 = 1:30
+      // 0 = bottom (me), 1 = lower-left, 2 = upper-left, 3 = upper-right, 4 = lower-right
       const posIndex = relPos;
 
       const el = document.getElementById(`player-pos-${posIndex}`);
@@ -333,6 +338,11 @@ class GameUI {
       if (player.isPicker) roleText = 'Picker';
       else if (player.isPartner) roleText = 'Partner';
 
+      // Get player scores
+      const scores = playerScores[player.id] || { daily: 0, lifetime: 0 };
+      const dailyScore = scores.daily;
+      const lifetimeScore = scores.lifetime;
+
       el.innerHTML = `
         <div class="player-box ${isCurrentPlayer ? 'current-turn' : ''} ${player.isPicker ? 'is-picker' : ''} ${player.isPartner ? 'is-partner' : ''} ${isMe ? 'is-me' : ''}">
           <div class="player-name">
@@ -340,6 +350,11 @@ class GameUI {
             ${player.isDealer ? '<span class="dealer-chip">D</span>' : ''}
           </div>
           ${roleText ? `<div class="player-role">${roleText}</div>` : ''}
+          <div class="player-scores">
+            <span class="score-daily" title="Today's score">${dailyScore >= 0 ? '+' : ''}${dailyScore}</span>
+            <span class="score-sep">/</span>
+            <span class="score-lifetime" title="Lifetime score">${lifetimeScore >= 0 ? '+' : ''}${lifetimeScore}</span>
+          </div>
           <div class="player-tricks">${player.tricksWon} tricks</div>
         </div>
       `;
@@ -568,7 +583,8 @@ class GameUI {
         `;
       }
 
-      if (!this.state.callableOptions.goAlone) {
+      // Always show Go Alone button (unless forced to go alone with no other options)
+      if (!this.state.callableOptions.goAlone || this.state.callableOptions.options.length > 0) {
         buttonsHtml += `<button class="btn" id="go-alone-btn">Go Alone</button>`;
       }
 
@@ -700,9 +716,16 @@ class GameUI {
     document.getElementById('game-screen').classList.add('hidden');
     document.getElementById('lobby-screen').classList.remove('hidden');
     this.state = null;
-    // Refresh room list when returning to lobby
+    // Refresh all lobby data when returning
     if (typeof loadRooms === 'function') {
       loadRooms();
+    }
+    if (typeof loadStats === 'function') {
+      // Refresh stats based on current view mode
+      loadStats(typeof statsViewMode !== 'undefined' ? statsViewMode : 'daily');
+    }
+    if (typeof loadLeaderboard === 'function') {
+      loadLeaderboard(typeof leaderboardViewMode !== 'undefined' ? leaderboardViewMode : 'daily');
     }
   }
 }

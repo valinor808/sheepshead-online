@@ -1,4 +1,20 @@
-// Main server entry point
+/**
+ * Main Server Entry Point
+ *
+ * Sets up Express server with Socket.IO for real-time game communication.
+ * Handles authentication via sessions and provides REST API endpoints.
+ *
+ * Socket Events:
+ * - joinRoom: Player joins a game room
+ * - leaveRoom: Player leaves current room
+ * - startGame: Start a new hand (requires 5 players)
+ * - pick: Player picks or passes during picking phase
+ * - bury: Picker buries 2 cards
+ * - callAce: Picker calls a partner (or goes alone)
+ * - playCard: Player plays a card during trick-taking
+ * - newHand: Player votes to continue to next hand
+ * - leaveTable: Player votes to leave after hand
+ */
 
 const express = require('express');
 const http = require('http');
@@ -158,10 +174,25 @@ app.get('/api/me', (req, res) => {
   });
 });
 
-// Get leaderboard
+// Get leaderboard (supports ?type=daily for daily leaderboard)
 app.get('/api/leaderboard', (req, res) => {
-  const leaderboard = User.getLeaderboard(20);
-  res.json(leaderboard);
+  const type = req.query.type || 'lifetime';
+  if (type === 'daily') {
+    const leaderboard = User.getDailyLeaderboard(20);
+    res.json(leaderboard);
+  } else {
+    const leaderboard = User.getLeaderboard(20);
+    res.json(leaderboard);
+  }
+});
+
+// Get daily stats for current user
+app.get('/api/stats/daily', (req, res) => {
+  if (req.session.userId === undefined || req.session.userId === null) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  const stats = User.getDailyStats(req.session.userId);
+  res.json(stats);
 });
 
 // Get rooms
@@ -184,7 +215,7 @@ io.on('connection', (socket) => {
     return;
   }
 
-  const oderId = sess.userId;
+  const oderId = sess.userId; // Note: Variable named for historical reasons
   const displayName = sess.displayName;
 
   socketUsers.set(socket.id, { oderId: 'user_' + oderId, displayName, dbId: oderId });
@@ -207,7 +238,15 @@ io.on('connection', (socket) => {
     socket.join(roomId);
 
     const game = roomManager.getRoom(roomId);
-    socket.emit('gameState', game.getStateForPlayer(playerId));
+
+    // Reset voting state when a new player joins (they shouldn't see stale voting data)
+    game.resetVoting();
+
+    // Get player scores for all players in the game
+    const playerScores = getPlayerScores(game);
+    const state = game.getStateForPlayer(playerId);
+    state.playerScores = playerScores;
+    socket.emit('gameState', state);
     socket.to(roomId).emit('playerJoined', { playerId, displayName, seatIndex: result.seatIndex });
 
     io.to(roomId).emit('roomUpdate', {
@@ -539,11 +578,24 @@ io.on('connection', (socket) => {
     return null;
   }
 
+  function getPlayerScores(game) {
+    const scores = {};
+    for (const player of game.players) {
+      const dbUserId = parseInt(player.id.replace('user_', ''));
+      const scoreSummary = User.getScoreSummary(dbUserId);
+      scores[player.id] = scoreSummary;
+    }
+    return scores;
+  }
+
   function broadcastGameState(game) {
+    const playerScores = getPlayerScores(game);
     for (const player of game.players) {
       const playerSocket = findSocketByPlayerId(player.id);
       if (playerSocket) {
-        playerSocket.emit('gameState', game.getStateForPlayer(player.id));
+        const state = game.getStateForPlayer(player.id);
+        state.playerScores = playerScores;
+        playerSocket.emit('gameState', state);
       }
     }
   }

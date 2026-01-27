@@ -1,4 +1,13 @@
-// Card rendering utilities
+/**
+ * Card Rendering Utilities
+ *
+ * Creates card elements for display using SVG images.
+ * Provides helpers for trump detection and suit display.
+ *
+ * Card Images:
+ * - Located in /images/cards/
+ * - Naming convention: {Rank}{SuitCode}.svg (e.g., "QH.svg" for Queen of Hearts)
+ */
 
 const SUIT_SYMBOLS = {
   diamonds: '♦',

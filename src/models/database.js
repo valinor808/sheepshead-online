@@ -1,4 +1,9 @@
-// SQLite database setup using sql.js (pure JavaScript, no native dependencies)
+/**
+ * SQLite database setup using sql.js (pure JavaScript, no native dependencies).
+ *
+ * This module provides a simple wrapper around sql.js for persistent storage.
+ * The database is saved to disk after each write operation.
+ */
 
 const initSqlJs = require('sql.js');
 const fs = require('fs');
@@ -63,6 +68,27 @@ async function initDb() {
       schneiders_achieved INTEGER DEFAULT 0,
       schwarz_achieved INTEGER DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Daily stats table for tracking stats per day
+  db.run(`
+    CREATE TABLE IF NOT EXISTS daily_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      hands_played INTEGER DEFAULT 0,
+      hands_picked INTEGER DEFAULT 0,
+      hands_won_as_picker INTEGER DEFAULT 0,
+      hands_won_as_partner INTEGER DEFAULT 0,
+      hands_won_as_defender INTEGER DEFAULT 0,
+      schwanzers_played INTEGER DEFAULT 0,
+      schwanzers_won INTEGER DEFAULT 0,
+      score INTEGER DEFAULT 0,
+      schneiders_achieved INTEGER DEFAULT 0,
+      schwarz_achieved INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, date)
     )
   `);
 
@@ -173,10 +199,8 @@ function run(sql, params = []) {
     const lastId = result.id;
     const changes = db.getRowsModified();
 
-    // Now save
+    // Persist to disk after each write
     saveDb();
-
-    console.log('DB run result:', { sql: sql.substring(0, 50), lastId, changes });
 
     return {
       lastInsertRowid: lastId,

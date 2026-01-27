@@ -1,3 +1,14 @@
+/**
+ * Sheepshead Online - Main Stylesheet
+ *
+ * Layout:
+ * - Auth Screen: Login/register forms
+ * - Lobby Screen: Room list, stats, leaderboard
+ * - Game Screen: Table with pentagon player layout, card hand area
+ *
+ * Color scheme uses a green felt table aesthetic with gold accents.
+ */
+
 /* Reset and base styles */
 * {
   box-sizing: border-box;
@@ -165,6 +176,45 @@ body {
   color: var(--accent);
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h2 {
+  margin-bottom: 0;
+}
+
+.stats-toggle {
+  display: flex;
+  gap: 5px;
+}
+
+.toggle-btn {
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #aaa;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toggle-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-dark);
+  font-weight: bold;
+}
+
 .room-input {
   display: flex;
   gap: 10px;
@@ -276,50 +326,43 @@ body {
   aspect-ratio: 16/10;
 }
 
-/* Player positions around the table - evenly spaced at 72° intervals */
-/* 5 players positioned around an ellipse, starting from bottom (you) going clockwise */
+/* Player positions around the table - pentagon with flat side at TOP */
+/* 5 players: You at bottom point, others clockwise around the table */
 .player-position {
   position: absolute;
   text-align: center;
   min-width: 100px;
 }
 
-/* Position 0: Bottom center (6 o'clock) - You */
-.player-position.pos-bottom {
-  bottom: 3%;
+/* Position 0: Bottom point (6 o'clock) - You */
+.player-position.pos-0 {
+  bottom: 2%;
   left: 50%;
   transform: translateX(-50%);
 }
 
-/* Position 1: Lower-left (~8 o'clock position) */
-.player-position.pos-8oclock {
-  top: 58%;
-  left: 5%;
+/* Position 1: Lower-left (~7:30 o'clock position) */
+.player-position.pos-1 {
+  top: 55%;
+  left: 3%;
 }
 
-/* Position 2: Upper-left (~10:30 position) */
-.player-position.pos-1030 {
-  top: 12%;
-  left: 12%;
+/* Position 2: Upper-left (~10:30 position) - part of flat top */
+.player-position.pos-2 {
+  top: 5%;
+  left: 15%;
 }
 
-/* Position 3: Top center (12 o'clock) */
-.player-position.pos-top {
-  top: 3%;
-  left: 50%;
-  transform: translateX(-50%);
+/* Position 3: Upper-right (~1:30 position) - part of flat top */
+.player-position.pos-3 {
+  top: 5%;
+  right: 15%;
 }
 
-/* Position 4: Upper-right (~1:30 position) */
-.player-position.pos-130 {
-  top: 12%;
-  right: 12%;
-}
-
-/* Position 5: Lower-right (~4 o'clock position) - for future 6-player games */
-.player-position.pos-4oclock {
-  top: 58%;
-  right: 5%;
+/* Position 4: Lower-right (~4:30 o'clock position) */
+.player-position.pos-4 {
+  top: 55%;
+  right: 3%;
 }
 
 .player-box {
@@ -361,6 +404,25 @@ body {
   font-size: 11px;
   color: var(--accent);
   margin-top: 3px;
+}
+
+.player-scores {
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.score-daily {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.score-sep {
+  color: #666;
+  margin: 0 2px;
+}
+
+.score-lifetime {
+  color: #aaa;
 }
 
 .dealer-chip {

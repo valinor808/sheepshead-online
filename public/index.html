@@ -62,13 +62,25 @@
         </div>
 
         <div class="lobby-section">
-          <h2>Your Stats</h2>
+          <div class="section-header">
+            <h2>Your Stats</h2>
+            <div class="stats-toggle">
+              <button class="toggle-btn active" id="stats-daily-btn">Daily</button>
+              <button class="toggle-btn" id="stats-lifetime-btn">Lifetime</button>
+            </div>
+          </div>
           <div id="player-stats" class="stats-grid">
           </div>
         </div>
 
         <div class="lobby-section">
-          <h2>Leaderboard</h2>
+          <div class="section-header">
+            <h2>Leaderboard</h2>
+            <div class="stats-toggle">
+              <button class="toggle-btn active" id="lb-daily-btn">Daily</button>
+              <button class="toggle-btn" id="lb-lifetime-btn">Lifetime</button>
+            </div>
+          </div>
           <div id="leaderboard" class="leaderboard">
           </div>
         </div>
@@ -84,12 +96,12 @@
       </header>
 
       <div class="game-table">
-        <!-- Clock positions: 0=bottom(me), 1=8oclock, 2=10:30, 3=12oclock, 4=1:30, 5=4oclock -->
-        <div class="player-position pos-bottom" id="player-pos-0"></div>
-        <div class="player-position pos-8oclock" id="player-pos-1"></div>
-        <div class="player-position pos-1030" id="player-pos-2"></div>
-        <div class="player-position pos-top" id="player-pos-3"></div>
-        <div class="player-position pos-130" id="player-pos-4"></div>
+        <!-- Pentagon layout: 0=bottom point (me), 1=lower-left, 2=upper-left, 3=upper-right, 4=lower-right -->
+        <div class="player-position pos-0" id="player-pos-0"></div>
+        <div class="player-position pos-1" id="player-pos-1"></div>
+        <div class="player-position pos-2" id="player-pos-2"></div>
+        <div class="player-position pos-3" id="player-pos-3"></div>
+        <div class="player-position pos-4" id="player-pos-4"></div>
 
         <div class="table-center">
           <div id="trick-area" class="trick-area"></div>

@@ -1,4 +1,23 @@
-// Main Sheepshead game logic
+/**
+ * Sheepshead Game Logic
+ *
+ * This module implements the core game logic for 5-player Sheepshead.
+ *
+ * Game Flow:
+ * 1. WAITING - Waiting for 5 players to join
+ * 2. DEALING - Cards dealt (6 per player, 2 to blind)
+ * 3. PICKING - Players decide to pick or pass (clockwise from dealer's left)
+ * 4. BURYING - Picker buries 2 cards (or SCHWANZER if everyone passed)
+ * 5. CALLING - Picker calls a partner (ace or goes alone)
+ * 6. PLAYING - 6 tricks are played
+ * 7. SCORING - Points tallied, scores assigned
+ *
+ * Key Rules:
+ * - Trump: All Queens, all Jacks, all Diamonds (in that order of power)
+ * - Picker vs Defenders: Picker + Partner need 61+ points to win
+ * - Under: When picker has all aces of a fail suit, they must call "under"
+ * - Schwanzer: When everyone passes, player with most "Schwanzer points" loses
+ */
 
 const {
   NUM_PLAYERS,
@@ -258,6 +277,11 @@ class SheepsheadGame {
 
   /**
    * Handle the picker burying cards
+   *
+   * Bury validation rules:
+   * 1. Cannot bury Queens or Jacks if you have other options
+   * 2. Must keep at least 1 non-ace fail card if possible
+   * 3. If (2) isn't possible, must keep at least 1 fail ace if possible
    */
   bury(playerId, cardIds) {
     if (this.phase !== PHASES.BURYING) {
@@ -281,10 +305,9 @@ class SheepsheadGame {
       toBury.push(hand[cardIndex]);
     }
 
-    // Check for invalid bury (can't bury queens or jacks unless no choice)
+    // Rule: Can't bury queens or jacks unless no choice
     const nonPointTrump = toBury.filter(c => (c.rank === 'Q' || c.rank === 'J'));
     if (nonPointTrump.length > 0) {
-      // Check if player has any other cards they could bury
       const otherCards = hand.filter(c =>
         !cardIds.includes(c.id) && c.rank !== 'Q' && c.rank !== 'J'
       );
@@ -293,8 +316,47 @@ class SheepsheadGame {
       }
     }
 
+    // Calculate what remains after burying
+    const remainingHand = hand.filter(c => !cardIds.includes(c.id));
+
+    // Get fail cards in remaining hand (non-trump cards)
+    const remainingFailCards = remainingHand.filter(c => !isTrump(c));
+    const remainingFailAces = remainingFailCards.filter(c => c.rank === 'A');
+    const remainingNonAceFail = remainingFailCards.filter(c => c.rank !== 'A');
+
+    // Get fail cards in the full hand (before bury)
+    const allFailCards = hand.filter(c => !isTrump(c));
+    const allFailAces = allFailCards.filter(c => c.rank === 'A');
+    const allNonAceFail = allFailCards.filter(c => c.rank !== 'A');
+
+    // Rule: Must keep at least 1 non-ace fail card if possible
+    if (remainingNonAceFail.length === 0 && allNonAceFail.length > 0) {
+      // Check if it was possible to keep at least one non-ace fail
+      // They must bury 2 cards. If they have > 2 non-ace fail, they must keep at least 1.
+      // But if they only have 1-2, they can bury all of them if needed.
+      // Actually the rule is: if you CAN keep a non-ace fail, you MUST.
+      // So if remaining has 0 but hand had some, check if any valid bury would keep one.
+
+      // Count how many non-trump non-ace cards we're burying
+      const buryingNonAceFail = toBury.filter(c => !isTrump(c) && c.rank !== 'A');
+
+      // If we're burying ALL non-ace fail cards, that's only OK if we had <= 2
+      if (allNonAceFail.length > BLIND_SIZE) {
+        return { success: false, error: 'Must keep at least one non-ace fail card if possible' };
+      }
+    }
+
+    // Rule: If no non-ace fail can be kept, must keep at least 1 fail ace if possible
+    if (remainingNonAceFail.length === 0 && remainingFailAces.length === 0 && allFailAces.length > 0) {
+      // No non-ace fail remains, and no fail aces remain, but we had fail aces
+      // This is only OK if we couldn't keep any fail aces (had <= 2 total fail aces)
+      if (allFailAces.length > BLIND_SIZE) {
+        return { success: false, error: 'Must keep at least one fail ace if no other fail cards' };
+      }
+    }
+
     // Remove buried cards from hand
-    this.hands[playerId] = hand.filter(c => !cardIds.includes(c.id));
+    this.hands[playerId] = remainingHand;
     this.buried = toBury;
 
     // Move to calling phase
@@ -805,10 +867,8 @@ class SheepsheadGame {
     // Calculate scores based on number of losers
     const scores = {};
     const numLosers = losers.length;
-    const numWinners = winners.length;
 
-    // Scoring table based on number of losers
-    // Total points always sum to zero
+    // Scoring table based on number of losers (total always sums to zero)
     let loserScore, winnerScore;
 
     switch (numLosers) {

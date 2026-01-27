@@ -1,4 +1,13 @@
-// Main application entry point
+/**
+ * Main Application Entry Point
+ *
+ * Handles authentication (login/register), lobby display, and socket connection setup.
+ * Manages transitions between auth screen, lobby, and game screens.
+ *
+ * Global Dependencies:
+ * - Socket.IO client (loaded via CDN)
+ * - GameUI class from game.js
+ */
 
 let socket = null;
 let gameUI = null;
@@ -132,24 +141,83 @@ async function showLobby(displayName, stats = null) {
 
   gameUI = new GameUI(socket);
 
-  // Load stats and rooms
-  if (!stats) {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      stats = data.stats;
-    }
+  // Cache lifetime stats if provided
+  if (stats) {
+    cachedLifetimeStats = stats;
   }
 
-  renderStats(stats);
+  // Setup toggle button listeners
+  setupStatsToggle();
+
+  // Load stats and rooms - default to daily view
+  loadStats('daily');
   loadRooms();
-  loadLeaderboard();
+  loadLeaderboard('daily');
 }
 
-function renderStats(stats) {
+function setupStatsToggle() {
+  // Stats toggle buttons
+  const statsDailyBtn = document.getElementById('stats-daily-btn');
+  const statsLifetimeBtn = document.getElementById('stats-lifetime-btn');
+
+  if (statsDailyBtn && statsLifetimeBtn) {
+    statsDailyBtn.onclick = () => {
+      statsViewMode = 'daily';
+      statsDailyBtn.classList.add('active');
+      statsLifetimeBtn.classList.remove('active');
+      if (cachedDailyStats) {
+        renderStats(cachedDailyStats, true);
+      } else {
+        loadStats('daily');
+      }
+    };
+
+    statsLifetimeBtn.onclick = () => {
+      statsViewMode = 'lifetime';
+      statsLifetimeBtn.classList.add('active');
+      statsDailyBtn.classList.remove('active');
+      if (cachedLifetimeStats) {
+        renderStats(cachedLifetimeStats, false);
+      } else {
+        loadStats('lifetime');
+      }
+    };
+  }
+
+  // Leaderboard toggle buttons
+  const lbDailyBtn = document.getElementById('lb-daily-btn');
+  const lbLifetimeBtn = document.getElementById('lb-lifetime-btn');
+
+  if (lbDailyBtn && lbLifetimeBtn) {
+    lbDailyBtn.onclick = () => {
+      leaderboardViewMode = 'daily';
+      lbDailyBtn.classList.add('active');
+      lbLifetimeBtn.classList.remove('active');
+      loadLeaderboard('daily');
+    };
+
+    lbLifetimeBtn.onclick = () => {
+      leaderboardViewMode = 'lifetime';
+      lbLifetimeBtn.classList.add('active');
+      lbDailyBtn.classList.remove('active');
+      loadLeaderboard('lifetime');
+    };
+  }
+}
+
+// Track current stats view mode
+let statsViewMode = 'daily';
+let leaderboardViewMode = 'daily';
+let cachedLifetimeStats = null;
+let cachedDailyStats = null;
+
+function renderStats(stats, isDaily = true) {
   if (!stats) return;
 
   const container = document.getElementById('player-stats');
+  const scoreLabel = isDaily ? 'Today\'s Score' : 'Total Score';
+  const score = isDaily ? (stats.score !== undefined ? stats.score : 0) : (stats.totalScore !== undefined ? stats.totalScore : 0);
+
   container.innerHTML = `
     <div class="stat-item">
       <div class="stat-value">${stats.handsPlayed}</div>
@@ -160,8 +228,8 @@ function renderStats(stats) {
       <div class="stat-label">Win Rate</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value">${stats.totalScore}</div>
-      <div class="stat-label">Total Score</div>
+      <div class="stat-value">${score}</div>
+      <div class="stat-label">${scoreLabel}</div>
     </div>
     <div class="stat-item">
       <div class="stat-value">${stats.handsPicked}</div>
@@ -176,6 +244,27 @@ function renderStats(stats) {
       <div class="stat-label">Schwanzers Won</div>
     </div>
   `;
+}
+
+async function loadStats(mode = 'daily') {
+  try {
+    if (mode === 'daily') {
+      const res = await fetch('/api/stats/daily', { credentials: 'include' });
+      if (res.ok) {
+        cachedDailyStats = await res.json();
+        renderStats(cachedDailyStats, true);
+      }
+    } else {
+      const res = await fetch('/api/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        cachedLifetimeStats = data.stats;
+        renderStats(cachedLifetimeStats, false);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
 }
 
 async function loadRooms() {
@@ -209,15 +298,18 @@ async function loadRooms() {
   }
 }
 
-async function loadLeaderboard() {
+async function loadLeaderboard(mode = 'daily') {
   try {
-    const res = await fetch('/api/leaderboard', { credentials: 'include' });
+    const url = mode === 'daily' ? '/api/leaderboard?type=daily' : '/api/leaderboard';
+    const res = await fetch(url, { credentials: 'include' });
     const leaders = await res.json();
 
     const container = document.getElementById('leaderboard');
+    const scoreLabel = mode === 'daily' ? 'Today' : 'Total';
 
     if (leaders.length === 0) {
-      container.innerHTML = '<p class="no-rooms">No games played yet!</p>';
+      const message = mode === 'daily' ? 'No games played today!' : 'No games played yet!';
+      container.innerHTML = `<p class="no-rooms">${message}</p>`;
       return;
     }
 
@@ -227,7 +319,7 @@ async function loadLeaderboard() {
           <tr>
             <th>#</th>
             <th>Player</th>
-            <th>Score</th>
+            <th>${scoreLabel}</th>
             <th>Hands</th>
           </tr>
         </thead>
