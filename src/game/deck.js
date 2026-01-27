@@ -178,17 +178,25 @@ function hasFailInSuit(hand, suit) {
 
 /**
  * Get valid cards that can be played given the current trick
+ *
+ * @param {Array} hand - Player's current hand
+ * @param {Array} currentTrick - Cards played so far in current trick
+ * @param {string} calledSuit - The suit that was called (null if going alone)
+ * @param {boolean} calledSuitHasBeenLed - Whether the called suit has been led yet
+ * @param {boolean} isPicker - Whether this player is the picker
+ * @param {boolean} hasCalledAce - Whether this player has the called ace (is the partner)
  */
-function getPlayableCards(hand, currentTrick, calledSuit = null, isFirstTrickOfCalledSuit = false) {
+function getPlayableCards(hand, currentTrick, calledSuit = null, calledSuitHasBeenLed = false, isPicker = false, hasCalledAce = false) {
   if (currentTrick.length === 0) {
-    // Leading - can play anything, but special rules for called ace
-    // If you have the called ace and lead its suit, you must play the ace
-    // unless you have at least 4 cards of that suit (can "run")
+    // LEADING - special rules apply
+
     if (calledSuit) {
       const cardsInCalledSuit = hand.filter(c => getEffectiveSuit(c) === calledSuit);
-      const hasCalledAce = hand.some(c => c.suit === calledSuit && c.rank === 'A');
+      const calledAceCard = hand.find(c => c.suit === calledSuit && c.rank === 'A');
 
-      if (hasCalledAce && cardsInCalledSuit.length > 0 && cardsInCalledSuit.length < 4) {
+      // PARTNER RULE: If you have the called ace, you cannot lead the called suit
+      // unless you lead with the ace itself, or you have 4+ cards in the suit ("running")
+      if (calledAceCard && cardsInCalledSuit.length > 0 && cardsInCalledSuit.length < 4) {
         // Can't lead called suit unless playing the ace
         return hand.filter(c => {
           if (getEffectiveSuit(c) === calledSuit) {
@@ -196,6 +204,20 @@ function getPlayableCards(hand, currentTrick, calledSuit = null, isFirstTrickOfC
           }
           return true;
         });
+      }
+
+      // PICKER RULE: Picker must keep at least one card of the called suit
+      // until the called suit is led. They can play other cards from that suit,
+      // but must retain at least one.
+      if (isPicker && !calledSuitHasBeenLed && cardsInCalledSuit.length > 0) {
+        // If picker only has 1 card in called suit, they can't play it yet
+        if (cardsInCalledSuit.length === 1) {
+          return hand.filter(c => getEffectiveSuit(c) !== calledSuit);
+        }
+        // If picker has multiple cards in called suit, they can play all but must keep one
+        // When leading, just prevent leading the called suit entirely if they'd be left with 0
+        // Actually for leading, they CAN lead the called suit as long as they keep one
+        // But simpler: they can lead anything, just enforce on non-leading plays
       }
     }
     return hand;
@@ -208,9 +230,8 @@ function getPlayableCards(hand, currentTrick, calledSuit = null, isFirstTrickOfC
   const cardsInSuit = hand.filter(c => getEffectiveSuit(c) === leadSuit);
 
   if (cardsInSuit.length > 0) {
-    // Special case: if called suit is led and this is the first time,
-    // partner must play the called ace if they have it
-    if (calledSuit && leadSuit === calledSuit && isFirstTrickOfCalledSuit) {
+    // PARTNER RULE: If called suit is led and you have the called ace, you MUST play it
+    if (calledSuit && leadSuit === calledSuit && hasCalledAce) {
       const calledAce = cardsInSuit.find(c => c.rank === 'A');
       if (calledAce) {
         return [calledAce];
@@ -220,6 +241,20 @@ function getPlayableCards(hand, currentTrick, calledSuit = null, isFirstTrickOfC
   }
 
   // Can't follow suit - can play anything
+  // BUT: Picker must keep at least one card of called suit until it's been led
+  if (calledSuit && isPicker && !calledSuitHasBeenLed) {
+    const cardsInCalledSuit = hand.filter(c => getEffectiveSuit(c) === calledSuit);
+    if (cardsInCalledSuit.length === 1) {
+      // Can't play the last card of called suit - must keep it
+      return hand.filter(c => getEffectiveSuit(c) !== calledSuit);
+    }
+    // If they have 2+, they can play one but must keep one
+    // This is tricky - we need to allow all cards EXCEPT if playing would leave them with 0
+    // Since we're not following suit here, we need to exclude one card from called suit
+    // Actually, let them play any non-called-suit card, or any called-suit card except if it's the last one
+    // The simplest rule: if they have exactly 1 in called suit, exclude it. Otherwise, allow all.
+  }
+
   return hand;
 }
 

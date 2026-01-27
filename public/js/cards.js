@@ -7,6 +7,13 @@ const SUIT_SYMBOLS = {
   clubs: '♣'
 };
 
+const SUIT_CODES = {
+  diamonds: 'D',
+  hearts: 'H',
+  spades: 'S',
+  clubs: 'C'
+};
+
 const RANK_DISPLAY = {
   '7': '7',
   '8': '8',
@@ -25,7 +32,14 @@ function isTrump(card) {
   return false;
 }
 
-// Create a card element
+// Get the SVG file path for a card
+function getCardImagePath(card) {
+  const suitCode = SUIT_CODES[card.suit];
+  const rank = card.rank;
+  return `/images/cards/${rank}${suitCode}.svg`;
+}
+
+// Create a card element with SVG image
 function createCardElement(card, options = {}) {
   const div = document.createElement('div');
   div.className = 'card ' + card.suit;
@@ -47,10 +61,13 @@ function createCardElement(card, options = {}) {
     div.classList.add('selected');
   }
 
-  div.innerHTML = `
-    <span class="card-rank">${RANK_DISPLAY[card.rank]}</span>
-    <span class="card-suit">${SUIT_SYMBOLS[card.suit]}</span>
-  `;
+  // Use SVG image
+  const img = document.createElement('img');
+  img.src = getCardImagePath(card);
+  img.alt = `${card.rank} of ${card.suit}`;
+  img.className = 'card-image';
+  img.draggable = false;
+  div.appendChild(img);
 
   return div;
 }

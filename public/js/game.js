@@ -37,6 +37,8 @@ class GameUI {
     this.socket.on('gameReset', (data) => this.handleGameReset(data));
     this.socket.on('playerLeavingTable', (data) => this.handlePlayerLeavingTable(data));
     this.socket.on('sessionEnded', (data) => this.handleSessionEnded(data));
+    this.socket.on('votingUpdate', (data) => this.handleVotingUpdate(data));
+    this.socket.on('returnToLobby', (data) => this.handleReturnToLobby(data));
 
     // UI events
     document.getElementById('start-game-btn').addEventListener('click', () => {
@@ -156,19 +158,50 @@ class GameUI {
 
   handlePlayerLeavingTable(data) {
     console.log('Player leaving table:', data);
-    // Update the leaving players display in the scoring overlay
-    const leavingEl = document.getElementById('players-leaving');
-    if (leavingEl && data.playersLeaving && data.playersLeaving.length > 0) {
-      leavingEl.textContent = `Leaving after this hand: ${data.playersLeaving.join(', ')}`;
-      leavingEl.classList.remove('hidden');
-    }
+    // This is now handled by votingUpdate
+  }
+
+  handleVotingUpdate(data) {
+    console.log('Voting update:', data);
+    // Update the voting display in the scoring overlay
+    this.updateVotingDisplay(data.playersNextHand, data.playersLeaving);
+  }
+
+  handleReturnToLobby(data) {
+    console.log('Return to lobby:', data);
+    document.getElementById('scoring-overlay').classList.add('hidden');
+    this.showLobby();
   }
 
   handleSessionEnded(data) {
     console.log('Session ended:', data);
-    alert(data.message);
     document.getElementById('scoring-overlay').classList.add('hidden');
     // State will be updated by gameState event
+  }
+
+  updateVotingDisplay(playersNextHand = [], playersLeaving = []) {
+    const leavingEl = document.getElementById('players-leaving');
+    const waitingEl = document.getElementById('players-waiting-next');
+
+    // Show players leaving
+    if (leavingEl) {
+      if (playersLeaving.length > 0) {
+        leavingEl.textContent = `Leaving: ${playersLeaving.join(', ')}`;
+        leavingEl.classList.remove('hidden');
+      } else {
+        leavingEl.classList.add('hidden');
+      }
+    }
+
+    // Show players waiting for next hand
+    if (waitingEl) {
+      if (playersNextHand.length > 0) {
+        waitingEl.textContent = `Waiting for next hand: ${playersNextHand.join(', ')}`;
+        waitingEl.classList.remove('hidden');
+      } else {
+        waitingEl.classList.add('hidden');
+      }
+    }
   }
 
   render() {
@@ -189,10 +222,32 @@ class GameUI {
     } else if (this.state.phase === 'scoring') {
       waitingOverlay.classList.add('hidden');
       // Scoring overlay is shown by handleHandComplete
+      // Update voting display from state
+      this.updateVotingDisplay(this.state.playersNextHand || [], this.state.playersLeaving || []);
+      // Update buttons based on voting state
+      this.updateScoringButtons();
     } else {
       waitingOverlay.classList.add('hidden');
       scoringOverlay.classList.add('hidden');
       this.renderGameTable();
+    }
+  }
+
+  updateScoringButtons() {
+    const newHandBtn = document.getElementById('new-hand-btn');
+    const leaveTableBtn = document.getElementById('leave-table-btn');
+
+    if (!this.state) return;
+
+    // Disable buttons if player has already voted
+    if (this.state.hasVoted) {
+      newHandBtn.disabled = true;
+      leaveTableBtn.disabled = true;
+      newHandBtn.textContent = 'Waiting...';
+    } else {
+      newHandBtn.disabled = false;
+      leaveTableBtn.disabled = false;
+      newHandBtn.textContent = 'Next Hand';
     }
   }
 
@@ -557,35 +612,50 @@ class GameUI {
     const details = document.getElementById('scoring-details');
     const scores = document.getElementById('scoring-scores');
     const leavingEl = document.getElementById('players-leaving');
+    const waitingEl = document.getElementById('players-waiting-next');
+    const buttonsContainer = document.querySelector('.scoring-buttons');
 
     overlay.classList.remove('hidden');
 
-    // Reset leaving players display
+    // Reset voting displays
     if (leavingEl) {
       leavingEl.classList.add('hidden');
       leavingEl.textContent = '';
     }
+    if (waitingEl) {
+      waitingEl.classList.add('hidden');
+      waitingEl.textContent = '';
+    }
+
+    // Show buttons (will be updated based on state)
+    if (buttonsContainer) {
+      buttonsContainer.classList.remove('hidden');
+    }
 
     if (results.type === 'schwanzer') {
       const losers = results.losers.map(id => this.state.players.find(p => p.id === id)?.name).join(', ');
-      const isTie = results.losers.length > 1;
+      const numLosers = results.losers.length;
+      const maxPoints = results.maxSchwanzerPoints;
 
       title.textContent = 'Schwanzer!';
 
-      let detailsHtml = '<p>Everyone passed - hand ends immediately!</p>';
-      if (isTie) {
-        detailsHtml += `<p><strong>Tied for most fail points (${results.maxFailPoints}):</strong> ${losers}</p>`;
-        detailsHtml += `<p>Tied losers win, others lose!</p>`;
-      } else {
-        detailsHtml += `<p><strong>Loser:</strong> ${losers} (${results.maxFailPoints} fail points)</p>`;
-      }
-      detailsHtml += `<p class="schwanzer-note"><em>Fail points: Queens=3, Jacks=2, Diamonds=1</em></p>`;
+      let detailsHtml = '<p>Everyone passed</p>';
 
-      // Show fail points breakdown
-      detailsHtml += '<div class="fail-points-breakdown"><strong>Fail points:</strong><br>';
+      if (numLosers === 5) {
+        detailsHtml += `<p><strong>All players tied with ${maxPoints} Schwanzer Points - Draw!</strong></p>`;
+      } else if (numLosers === 1) {
+        detailsHtml += `<p><strong>Loser:</strong> ${losers} (${maxPoints} Schwanzer Points)</p>`;
+      } else {
+        detailsHtml += `<p><strong>Tied losers (${maxPoints} Schwanzer Points):</strong> ${losers}</p>`;
+      }
+
+      detailsHtml += `<p class="schwanzer-note"><em>Schwanzer Points: Queens=3, Jacks=2, Diamonds=1</em></p>`;
+
+      // Show Schwanzer points breakdown
+      detailsHtml += '<div class="schwanzer-points-breakdown"><strong>Schwanzer Points:</strong><br>';
       for (const player of this.state.players) {
-        const fp = results.playerFailPoints[player.id];
-        detailsHtml += `${player.name}: ${fp} | `;
+        const sp = results.playerSchwanzerPoints[player.id];
+        detailsHtml += `${player.name}: ${sp} | `;
       }
       detailsHtml = detailsHtml.slice(0, -3) + '</div>';
 

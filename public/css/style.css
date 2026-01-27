@@ -276,48 +276,49 @@ body {
   aspect-ratio: 16/10;
 }
 
-/* Player positions around the table - clock face layout */
+/* Player positions around the table - evenly spaced at 72° intervals */
+/* 5 players positioned around an ellipse, starting from bottom (you) going clockwise */
 .player-position {
   position: absolute;
   text-align: center;
   min-width: 100px;
 }
 
-/* Bottom - current player (6 o'clock) */
+/* Position 0: Bottom center (6 o'clock) - You */
 .player-position.pos-bottom {
-  bottom: 2%;
+  bottom: 3%;
   left: 50%;
   transform: translateX(-50%);
 }
 
-/* 8 o'clock position */
+/* Position 1: Lower-left (~8 o'clock position) */
 .player-position.pos-8oclock {
-  bottom: 25%;
+  top: 58%;
   left: 5%;
 }
 
-/* 10:30 position */
+/* Position 2: Upper-left (~10:30 position) */
 .player-position.pos-1030 {
-  top: 15%;
+  top: 12%;
   left: 12%;
 }
 
-/* Top - 12 o'clock */
+/* Position 3: Top center (12 o'clock) */
 .player-position.pos-top {
-  top: 2%;
+  top: 3%;
   left: 50%;
   transform: translateX(-50%);
 }
 
-/* 1:30 position */
+/* Position 4: Upper-right (~1:30 position) */
 .player-position.pos-130 {
-  top: 15%;
+  top: 12%;
   right: 12%;
 }
 
-/* 4 o'clock position (unused with 5 players but defined for completeness) */
+/* Position 5: Lower-right (~4 o'clock position) - for future 6-player games */
 .player-position.pos-4oclock {
-  bottom: 25%;
+  top: 58%;
   right: 5%;
 }
 
@@ -505,7 +506,14 @@ body {
   transition: transform 0.15s, box-shadow 0.15s;
   border: 2px solid #ddd;
   position: relative;
-  font-family: 'Georgia', serif;
+  overflow: hidden;
+}
+
+.card .card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .card:hover {
@@ -529,30 +537,7 @@ body {
 }
 
 .card.trump {
-  background: linear-gradient(135deg, #fffbea 0%, #fff 100%);
-}
-
-.card .card-rank {
-  font-size: 1.2rem;
-  font-weight: bold;
-}
-
-.card .card-suit {
-  font-size: 1.5rem;
-}
-
-.card.hearts .card-rank,
-.card.hearts .card-suit,
-.card.diamonds .card-rank,
-.card.diamonds .card-suit {
-  color: #dc3545;
-}
-
-.card.spades .card-rank,
-.card.spades .card-suit,
-.card.clubs .card-rank,
-.card.clubs .card-suit {
-  color: #333;
+  box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
 
 .card-back {
@@ -570,12 +555,9 @@ body {
   height: 72px;
 }
 
-.card.small .card-rank {
-  font-size: 0.9rem;
-}
-
-.card.small .card-suit {
-  font-size: 1.1rem;
+.card.small .card-image {
+  width: 100%;
+  height: 100%;
 }
 
 /* Overlays */
@@ -654,6 +636,15 @@ body {
 .players-leaving {
   background: rgba(220, 53, 69, 0.2);
   border: 1px solid rgba(220, 53, 69, 0.5);
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.players-waiting {
+  background: rgba(40, 167, 69, 0.2);
+  border: 1px solid rgba(40, 167, 69, 0.5);
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 15px;

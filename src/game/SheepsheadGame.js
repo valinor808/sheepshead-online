@@ -73,8 +73,9 @@ class SheepsheadGame {
     // Scoring
     this.handResults = null;    // Results of the completed hand
 
-    // Session management
-    this.playersLeaving = [];   // Players who signaled they want to leave after this hand
+    // Session management - end-of-hand voting
+    this.playersLeaving = [];   // Players who clicked "Leave Table"
+    this.playersNextHand = [];  // Players who clicked "Next Hand"
   }
 
   /**
@@ -523,14 +524,19 @@ class SheepsheadGame {
 
     // Check if card is playable (unless it's the forced under card play)
     if (!mustPlayUnderCard) {
-      const isFirstCalledSuitTrick = this.calledSuit && this.calledSuitFirstTrick &&
-        (isLeading ? getEffectiveSuit(card) === this.calledSuit : leadSuit === this.calledSuit);
+      // Determine if this player is the picker
+      const isPicker = playerId === this.picker;
+      // Determine if this player has the called ace (is the partner)
+      const hasCalledAce = this.calledSuit && !isPicker &&
+        hand.some(c => c.suit === this.calledSuit && c.rank === this.calledRank);
 
       const playableCards = getPlayableCards(
         hand,
         this.currentTrick,
         this.calledSuit,
-        isFirstCalledSuitTrick && !isLeading
+        !this.calledSuitFirstTrick, // calledSuitHasBeenLed
+        isPicker,
+        hasCalledAce
       );
 
       if (!playableCards.find(c => c.id === cardId)) {
@@ -773,51 +779,70 @@ class SheepsheadGame {
   /**
    * Score a Schwanzer hand
    * Everyone passed - hand ends immediately
-   * Loser = player with most fail points (Q=3, J=2, diamonds=1)
-   * If tie: losers get positive points, winners get negative (sum to zero)
+   * Loser = player(s) with most Schwanzer Points (Q=3, J=2, diamonds=1)
+   *
+   * Scoring:
+   * - 1 loser: -4, everyone else +1
+   * - 2 losers tied: -3 each, everyone else +2
+   * - 3 losers tied: -2 each, everyone else +3
+   * - 4 losers tied: -1 each, 1 winner gets +4
+   * - 5 losers tied: 0 each (draw)
    */
   _scoreSchwanzer() {
-    // Calculate fail points for each player's dealt hand
-    const playerFailPoints = {};
+    // Calculate Schwanzer points for each player's dealt hand
+    const playerSchwanzerPoints = {};
     for (const player of this.players) {
-      playerFailPoints[player.id] = this._calculateFailPoints(this.hands[player.id]);
+      playerSchwanzerPoints[player.id] = this._calculateFailPoints(this.hands[player.id]);
     }
 
-    // Find max fail points
-    const maxFailPoints = Math.max(...Object.values(playerFailPoints));
+    // Find max Schwanzer points
+    const maxSchwanzerPoints = Math.max(...Object.values(playerSchwanzerPoints));
 
-    // Find all players with max fail points (losers)
-    const losers = this.players.filter(p => playerFailPoints[p.id] === maxFailPoints);
-    const winners = this.players.filter(p => playerFailPoints[p.id] < maxFailPoints);
+    // Find all players with max Schwanzer points (losers)
+    const losers = this.players.filter(p => playerSchwanzerPoints[p.id] === maxSchwanzerPoints);
+    const winners = this.players.filter(p => playerSchwanzerPoints[p.id] < maxSchwanzerPoints);
 
-    // Calculate scores
-    // If tie: losers split positive, winners split negative, sum to zero
-    // Normal: 1 loser gets -4, 4 winners get +1 each
+    // Calculate scores based on number of losers
     const scores = {};
+    const numLosers = losers.length;
+    const numWinners = winners.length;
 
-    if (losers.length === 1) {
-      // Normal case: 1 loser (-4), 4 winners (+1 each)
-      for (const player of this.players) {
-        if (losers[0].id === player.id) {
-          scores[player.id] = -4;
-        } else {
-          scores[player.id] = 1;
-        }
-      }
-    } else {
-      // Tie case: points must sum to zero
-      // Each loser gets positive points, each winner gets negative
-      // Total distributed = 4, split among losers and winners
-      const loserScore = Math.floor(4 / losers.length);
-      const totalLoserPoints = loserScore * losers.length;
-      const winnerScore = winners.length > 0 ? -Math.floor(totalLoserPoints / winners.length) : 0;
+    // Scoring table based on number of losers
+    // Total points always sum to zero
+    let loserScore, winnerScore;
 
-      for (const player of this.players) {
-        if (playerFailPoints[player.id] === maxFailPoints) {
-          scores[player.id] = loserScore;
-        } else {
-          scores[player.id] = winnerScore;
-        }
+    switch (numLosers) {
+      case 1:
+        loserScore = -4;
+        winnerScore = 1;
+        break;
+      case 2:
+        loserScore = -3;
+        winnerScore = 2;
+        break;
+      case 3:
+        loserScore = -2;
+        winnerScore = 3;
+        break;
+      case 4:
+        loserScore = -1;
+        winnerScore = 4;
+        break;
+      case 5:
+        // All tied - draw
+        loserScore = 0;
+        winnerScore = 0;
+        break;
+      default:
+        loserScore = 0;
+        winnerScore = 0;
+    }
+
+    for (const player of this.players) {
+      if (playerSchwanzerPoints[player.id] === maxSchwanzerPoints) {
+        scores[player.id] = loserScore;
+      } else {
+        scores[player.id] = winnerScore;
       }
     }
 
@@ -825,9 +850,9 @@ class SheepsheadGame {
       type: 'schwanzer',
       losers: losers.map(p => p.id),
       winners: winners.map(p => p.id),
-      maxFailPoints,
+      maxSchwanzerPoints,
       scores,
-      playerFailPoints
+      playerSchwanzerPoints
     };
   }
 
@@ -903,13 +928,19 @@ class SheepsheadGame {
           state.mustPlayUnderCard = true;
           state.playableCards = [this.underCardId];
         } else {
+          // Determine if this player is the picker
+          const isPicker = playerId === this.picker;
+          // Determine if this player has the called ace (is the partner)
+          const hasCalledAce = this.calledSuit && !isPicker &&
+            this.hands[playerId].some(c => c.suit === this.calledSuit && c.rank === this.calledRank);
+
           state.playableCards = getPlayableCards(
             this.hands[playerId],
             this.currentTrick,
             this.calledSuit,
-            this.calledSuit && this.calledSuitFirstTrick &&
-              this.currentTrick.length > 0 &&
-              getEffectiveSuit(this.currentTrick[0].card) === this.calledSuit
+            !this.calledSuitFirstTrick, // calledSuitHasBeenLed (inverted from calledSuitFirstTrick)
+            isPicker,
+            hasCalledAce
           ).map(c => c.id);
         }
       }
@@ -918,6 +949,9 @@ class SheepsheadGame {
     if (this.phase === PHASES.SCORING) {
       state.results = this.handResults;
       state.playersLeaving = this.getLeavingPlayerNames();
+      state.playersNextHand = this.getNextHandPlayerNames();
+      state.allVoted = this.haveAllPlayersVoted();
+      state.hasVoted = this.playersLeaving.includes(playerId) || this.playersNextHand.includes(playerId);
     }
 
     return state;
@@ -945,7 +979,38 @@ class SheepsheadGame {
     if (!this.playersLeaving.includes(playerId)) {
       this.playersLeaving.push(playerId);
     }
-    return { success: true, playersLeaving: this.playersLeaving };
+    // Remove from nextHand if they were there
+    this.playersNextHand = this.playersNextHand.filter(id => id !== playerId);
+
+    return {
+      success: true,
+      playersLeaving: this.playersLeaving,
+      allVoted: this.haveAllPlayersVoted()
+    };
+  }
+
+  /**
+   * Mark a player as wanting to continue to the next hand
+   */
+  markPlayerNextHand(playerId) {
+    if (!this.playersNextHand.includes(playerId)) {
+      this.playersNextHand.push(playerId);
+    }
+    // Remove from leaving if they were there (changed mind)
+    this.playersLeaving = this.playersLeaving.filter(id => id !== playerId);
+
+    return {
+      success: true,
+      playersNextHand: this.playersNextHand,
+      allVoted: this.haveAllPlayersVoted()
+    };
+  }
+
+  /**
+   * Check if all players have voted (either leave or next hand)
+   */
+  haveAllPlayersVoted() {
+    return (this.playersLeaving.length + this.playersNextHand.length) >= this.players.length;
   }
 
   /**
@@ -956,12 +1021,36 @@ class SheepsheadGame {
   }
 
   /**
+   * Check if all players voted to continue
+   */
+  allVotedNextHand() {
+    return this.playersNextHand.length === this.players.length;
+  }
+
+  /**
    * Get list of leaving players' names
    */
   getLeavingPlayerNames() {
     return this.playersLeaving
       .map(id => this.players.find(p => p.id === id)?.name)
       .filter(Boolean);
+  }
+
+  /**
+   * Get list of players waiting for next hand
+   */
+  getNextHandPlayerNames() {
+    return this.playersNextHand
+      .map(id => this.players.find(p => p.id === id)?.name)
+      .filter(Boolean);
+  }
+
+  /**
+   * Reset voting state for next hand
+   */
+  resetVoting() {
+    this.playersLeaving = [];
+    this.playersNextHand = [];
   }
 }
 
