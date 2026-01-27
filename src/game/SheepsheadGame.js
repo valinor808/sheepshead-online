@@ -56,10 +56,14 @@ class SheepsheadGame {
     this.picker = null;         // Player ID of picker
     this.partner = null;        // Player ID of partner (null until revealed)
     this.calledSuit = null;     // The suit of the called ace
+    this.calledRank = 'A';      // Usually Ace, but can be 10 if picker has all 3 fail aces
+    this.isUnderCall = false;   // True if picker is calling "under"
+    this.underCardId = null;    // ID of card designated as "under" (stays in hand, marked)
+    this.underCardPlayed = false; // Has the under card been played yet?
     this.calledSuitFirstTrick = true; // Has the called suit been led yet?
 
     // Trick state
-    this.currentTrick = [];     // Array of {playerId, card}
+    this.currentTrick = [];     // Array of {playerId, card, isUnderCard}
     this.tricks = [];           // Completed tricks with winner info
     this.tricksWon = {};        // playerId -> array of tricks won
 
@@ -68,6 +72,9 @@ class SheepsheadGame {
 
     // Scoring
     this.handResults = null;    // Results of the completed hand
+
+    // Session management
+    this.playersLeaving = [];   // Players who signaled they want to leave after this hand
   }
 
   /**
@@ -99,9 +106,7 @@ class SheepsheadGame {
     const index = this.players.findIndex(p => p.id === playerId);
     if (index === -1) return { success: false, error: 'Player not found' };
 
-    if (this.phase !== PHASES.WAITING) {
-      return { success: false, error: 'Cannot leave during game' };
-    }
+    const wasInGame = this.phase !== PHASES.WAITING;
 
     this.players.splice(index, 1);
     delete this.hands[playerId];
@@ -110,7 +115,42 @@ class SheepsheadGame {
     // Reindex seats
     this.players.forEach((p, i) => p.seatIndex = i);
 
-    return { success: true };
+    // If game was in progress, reset to waiting state
+    if (wasInGame) {
+      this.resetToWaiting();
+    }
+
+    return { success: true, gameReset: wasInGame };
+  }
+
+  /**
+   * Reset game to waiting state (when a player leaves mid-game)
+   */
+  resetToWaiting() {
+    this.phase = PHASES.WAITING;
+    this.blind = [];
+    this.buried = [];
+    this.picker = null;
+    this.partner = null;
+    this.calledSuit = null;
+    this.calledRank = 'A';
+    this.isUnderCall = false;
+    this.underCardId = null;
+    this.underCardPlayed = false;
+    this.calledSuitFirstTrick = true;
+    this.currentTrick = [];
+    this.tricks = [];
+    this.passedPlayers = [];
+    this.isSchwanzer = false;
+    this.handResults = null;
+    this.currentPlayerIndex = 0;
+    this.pickingIndex = 0;
+
+    // Clear hands and tricks for remaining players
+    for (const p of this.players) {
+      this.hands[p.id] = [];
+      this.tricksWon[p.id] = [];
+    }
   }
 
   /**
@@ -128,6 +168,10 @@ class SheepsheadGame {
     this.picker = null;
     this.partner = null;
     this.calledSuit = null;
+    this.calledRank = 'A';
+    this.isUnderCall = false;
+    this.underCardId = null;
+    this.underCardPlayed = false;
     this.calledSuitFirstTrick = true;
     this.currentTrick = [];
     this.tricks = [];
@@ -197,12 +241,14 @@ class SheepsheadGame {
 
       // Check if everyone passed
       if (this.passedPlayers.length === NUM_PLAYERS) {
-        // Schwanzer (leasters)!
+        // Schwanzer! Hand ends immediately
         this.isSchwanzer = true;
-        this.phase = PHASES.SCHWANZER;
-        // In schwanzer, player to left of dealer leads
-        this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
-        return { success: true, schwanzer: true };
+        this.phase = PHASES.SCORING;
+        const results = this._scoreSchwanzer();
+        this.handResults = results;
+        // Advance dealer for next hand
+        this.dealerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
+        return { success: true, schwanzer: true, handComplete: true, results };
       }
 
       return { success: true, passed: true };
@@ -256,41 +302,103 @@ class SheepsheadGame {
   }
 
   /**
-   * Get the suits the picker can call
-   * Can call a suit if: they don't have that ace, OR they have the ONLY ace of that suit
-   * (under-suit call when they have the only relevant ace)
+   * Get the suits/ranks the picker can call
+   *
+   * Under Rules:
+   * Under is allowed ONLY if the picker has NO fail suit where they don't have the ace.
+   * In other words: every fail suit they hold must include that suit's ace.
+   *
+   * Examples:
+   * - No fail cards (all trump): Under allowed - call any ace
+   * - Only hearts fail, but have ace of hearts: Under allowed - call clubs/spades ace
+   * - Hearts fail without ace of hearts: Normal call - must call hearts ace
+   * - Have all 3 fail aces: Can call a 10 instead (special case)
+   *
+   * The under card stays in hand, marked, and must be manually played when called suit is led.
    */
   getCallableOptions(playerId) {
     const hand = this.hands[playerId];
     const options = [];
 
+    // Analyze the hand by suit
+    const acesHeld = [];  // Fail aces in hand
+    const tensHeld = [];  // Fail 10s in hand
+    const failSuitsWithoutAce = []; // Fail suits where we have cards but NOT the ace
+
     for (const suit of FAIL_SUITS) {
       const hasThisAce = hasAce(hand, suit);
-      const hasFailCards = hasFailInSuit(hand, suit);
+      const hasThis10 = hand.some(card => card.suit === suit && card.rank === '10' && !isTrump(card));
 
-      if (!hasThisAce) {
-        // Normal call - don't have the ace
-        options.push({ suit, type: 'normal' });
-      } else if (hasFailCards) {
-        // Under-suit call - have the ace and other cards in suit
-        // This is allowed when you're the only one who COULD have the ace
-        // (i.e., you have it, so no one else does)
-        options.push({ suit, type: 'under', warning: 'You have this ace - calling under' });
+      // Check if we have ANY fail cards in this suit
+      const hasFailInThisSuit = hand.some(card =>
+        card.suit === suit && !isTrump(card)
+      );
+
+      if (hasThisAce) {
+        acesHeld.push(suit);
+      }
+      if (hasThis10) {
+        tensHeld.push(suit);
+      }
+
+      // If we have fail cards in this suit but NOT the ace, it's a "fail suit without ace"
+      if (hasFailInThisSuit && !hasThisAce) {
+        failSuitsWithoutAce.push(suit);
       }
     }
 
-    // If no options (has all three fail aces with no fail), must go alone
-    if (options.length === 0) {
-      return { goAlone: true, options: [] };
+    // Case 1: Picker has all 3 fail aces - special case, can call a 10
+    if (acesHeld.length === 3) {
+      // Can call a 10 of any fail suit they DON'T have the 10 of
+      for (const suit of FAIL_SUITS) {
+        if (!tensHeld.includes(suit)) {
+          options.push({ suit, rank: '10', type: 'under' });
+        }
+      }
+      // If they have all 3 fail 10s too, must go alone
+      if (options.length === 0) {
+        return { goAlone: true, options: [], reason: 'Have all 3 fail aces and all fail 10s' };
+      }
+      return { goAlone: false, options, mustSelectUnderCard: true };
     }
 
-    return { goAlone: false, options };
+    // Case 2: Picker has at least one fail suit WITHOUT the ace - normal call
+    // They must call one of those suits
+    if (failSuitsWithoutAce.length > 0) {
+      for (const suit of failSuitsWithoutAce) {
+        options.push({ suit, rank: 'A', type: 'normal' });
+      }
+      // Also allow calling any OTHER fail suit they don't have the ace of
+      for (const suit of FAIL_SUITS) {
+        if (!acesHeld.includes(suit) && !failSuitsWithoutAce.includes(suit)) {
+          options.push({ suit, rank: 'A', type: 'normal' });
+        }
+      }
+      return { goAlone: false, options, mustSelectUnderCard: false };
+    }
+
+    // Case 3: Picker has NO fail suit without ace (under required)
+    // Every fail suit they have includes the ace, OR they have no fail at all
+    // Must call under - call any ace they DON'T have
+    for (const suit of FAIL_SUITS) {
+      if (!acesHeld.includes(suit)) {
+        options.push({ suit, rank: 'A', type: 'under' });
+      }
+    }
+
+    if (options.length === 0) {
+      // Has all aces - should have been caught in Case 1
+      return { goAlone: true, options: [], reason: 'No valid call options' };
+    }
+
+    return { goAlone: false, options, mustSelectUnderCard: true };
   }
 
   /**
-   * Handle the picker calling an ace
+   * Handle the picker calling a card (Ace or 10 in some cases)
+   * For under calls, an under card must also be selected (stays in hand, marked)
    */
-  callAce(playerId, suit, goAlone = false) {
+  callAce(playerId, suit, goAlone = false, underCardId = null) {
     if (this.phase !== PHASES.CALLING) {
       return { success: false, error: 'Not in calling phase' };
     }
@@ -301,7 +409,10 @@ class SheepsheadGame {
     if (goAlone) {
       // Picker goes alone - no partner
       this.calledSuit = null;
+      this.calledRank = 'A';
       this.partner = null;
+      this.isUnderCall = false;
+      this.underCardId = null;
       this.phase = PHASES.PLAYING;
       this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
       return { success: true, goAlone: true };
@@ -310,7 +421,7 @@ class SheepsheadGame {
     const callableOptions = this.getCallableOptions(playerId);
 
     if (callableOptions.goAlone) {
-      return { success: false, error: 'You must go alone - no valid ace to call' };
+      return { success: false, error: 'You must go alone - ' + (callableOptions.reason || 'no valid card to call') };
     }
 
     const validOption = callableOptions.options.find(o => o.suit === suit);
@@ -318,15 +429,44 @@ class SheepsheadGame {
       return { success: false, error: 'Cannot call that suit' };
     }
 
+    // Check if this is an under call requiring an under card selection
+    if (validOption.type === 'under' || callableOptions.mustSelectUnderCard) {
+      if (!underCardId) {
+        return { success: false, error: 'Under call requires selecting an under card', needsUnderCard: true };
+      }
+
+      // Validate under card is in picker's hand
+      const hand = this.hands[playerId];
+      const underCardIndex = hand.findIndex(c => c.id === underCardId);
+      if (underCardIndex === -1) {
+        return { success: false, error: 'Under card not in hand' };
+      }
+
+      // Store the under card ID - card stays in hand, just marked
+      this.underCardId = underCardId;
+      this.isUnderCall = true;
+    } else {
+      this.isUnderCall = false;
+      this.underCardId = null;
+    }
+
     this.calledSuit = suit;
-    // Partner is not revealed until they play the called ace
+    this.calledRank = validOption.rank || 'A';
+    // Partner is not revealed until they play the called card
+    // For under call, partner is revealed when under card is played
     this.partner = null;
 
     // Move to playing phase
     this.phase = PHASES.PLAYING;
     this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
 
-    return { success: true, calledSuit: suit, isUnderCall: validOption.type === 'under' };
+    return {
+      success: true,
+      calledSuit: suit,
+      calledRank: this.calledRank,
+      isUnderCall: this.isUnderCall,
+      underCardId: this.underCardId
+    };
   }
 
   /**
@@ -343,38 +483,78 @@ class SheepsheadGame {
     }
 
     const hand = this.hands[playerId];
+    const isLeading = this.currentTrick.length === 0;
+    const leadSuit = isLeading ? null : getEffectiveSuit(this.currentTrick[0].card);
+
+    // Check if this is the under card being played
+    const isPlayingUnderCard = this.isUnderCall &&
+      this.underCardId &&
+      !this.underCardPlayed &&
+      playerId === this.picker &&
+      cardId === this.underCardId;
+
+    // Check if picker MUST play under card (called suit is led and under card not yet played)
+    const mustPlayUnderCard = this.isUnderCall &&
+      this.underCardId &&
+      !this.underCardPlayed &&
+      playerId === this.picker &&
+      !isLeading &&
+      leadSuit === this.calledSuit;
+
+    // If must play under card but player selected a different card, reject
+    if (mustPlayUnderCard && cardId !== this.underCardId) {
+      return { success: false, error: 'You must play your under card when the called suit is led' };
+    }
+
+    // Validate the selected card is in hand
     const cardIndex = hand.findIndex(c => c.id === cardId);
     if (cardIndex === -1) {
       return { success: false, error: 'Card not in hand' };
     }
 
     const card = hand[cardIndex];
+    let isUnderCard = false;
 
-    // Check if card is playable
-    const isLeading = this.currentTrick.length === 0;
-    const leadSuit = isLeading ? null : getEffectiveSuit(this.currentTrick[0].card);
-    const isFirstCalledSuitTrick = this.calledSuit && this.calledSuitFirstTrick &&
-      (isLeading ? getEffectiveSuit(card) === this.calledSuit : leadSuit === this.calledSuit);
-
-    const playableCards = getPlayableCards(
-      hand,
-      this.currentTrick,
-      this.calledSuit,
-      isFirstCalledSuitTrick && !isLeading
-    );
-
-    if (!playableCards.find(c => c.id === cardId)) {
-      return { success: false, error: 'Cannot play that card' };
+    if (isPlayingUnderCard) {
+      // Mark this as the under card play
+      isUnderCard = true;
+      this.underCardPlayed = true;
     }
 
-    // Play the card
-    this.hands[playerId].splice(cardIndex, 1);
-    this.currentTrick.push({ playerId, card });
+    // Check if card is playable (unless it's the forced under card play)
+    if (!mustPlayUnderCard) {
+      const isFirstCalledSuitTrick = this.calledSuit && this.calledSuitFirstTrick &&
+        (isLeading ? getEffectiveSuit(card) === this.calledSuit : leadSuit === this.calledSuit);
 
-    // Check if partner is revealed
+      const playableCards = getPlayableCards(
+        hand,
+        this.currentTrick,
+        this.calledSuit,
+        isFirstCalledSuitTrick && !isLeading
+      );
+
+      if (!playableCards.find(c => c.id === cardId)) {
+        return { success: false, error: 'Cannot play that card' };
+      }
+    }
+
+    // Remove card from hand
+    this.hands[playerId].splice(cardIndex, 1);
+
+    // Add card to current trick (mark if it's the under card - played face-down)
+    this.currentTrick.push({ playerId, card, isUnderCard });
+
+    // Check if partner is revealed (played the called card)
     let partnerRevealed = false;
-    if (this.calledSuit && !this.partner &&
-        card.suit === this.calledSuit && card.rank === 'A') {
+    if (this.calledSuit && !this.partner && !isUnderCard &&
+        card.suit === this.calledSuit && card.rank === this.calledRank) {
+      this.partner = playerId;
+      partnerRevealed = true;
+    }
+
+    // For under calls, when picker plays the under card, they become their own partner
+    // The under card is treated as if it's the called card for partnership purposes
+    if (isUnderCard && !this.partner) {
       this.partner = playerId;
       partnerRevealed = true;
     }
@@ -395,6 +575,7 @@ class SheepsheadGame {
     return {
       success: true,
       card,
+      isUnderCard,
       partnerRevealed: partnerRevealed ? playerId : null,
       trickComplete: false
     };
@@ -404,7 +585,11 @@ class SheepsheadGame {
    * Complete a trick and determine winner
    */
   _completeTrick(partnerRevealed) {
-    const winner = determineTrickWinner(this.currentTrick);
+    // Filter out under cards when determining winner - under cards can't win
+    const eligiblePlays = this.currentTrick.filter(t => !t.isUnderCard);
+    const winner = determineTrickWinner(eligiblePlays);
+
+    // All cards count for points though (including hole card)
     const trickCards = this.currentTrick.map(t => t.card);
     const points = calculatePoints(trickCards);
 
@@ -542,6 +727,10 @@ class SheepsheadGame {
       }
     }
 
+    // Calculate tricks won by each team
+    const pickingTeamTricks = pickingTeam.reduce((sum, id) => sum + this.tricksWon[id].length, 0);
+    const defendingTeamTricks = defendingTeam.reduce((sum, id) => sum + this.tricksWon[id].length, 0);
+
     return {
       type: 'normal',
       picker: this.picker,
@@ -551,6 +740,8 @@ class SheepsheadGame {
       defendingTeam,
       pickingPoints,
       defendingPoints,
+      pickingTeamTricks,
+      defendingTeamTricks,
       buriedPoints,
       pickersWin,
       schneider,
@@ -563,57 +754,80 @@ class SheepsheadGame {
   }
 
   /**
-   * Score a Schwanzer (leasters) hand
-   * Player with fewest points wins, but must take at least one trick
+   * Calculate fail points for a hand (Queens=3, Jacks=2, all other diamonds=1)
    */
-  _scoreSchwanzer() {
-    // Calculate points for each player
-    const playerPoints = {};
-    const playerTrickCounts = {};
-
-    for (const player of this.players) {
-      const tricks = this.tricksWon[player.id];
-      playerTrickCounts[player.id] = tricks.length;
-      playerPoints[player.id] = tricks.reduce((sum, trick) => sum + trick.points, 0);
-    }
-
-    // Blind points go to whoever takes the last trick
-    const lastTrick = this.tricks[this.tricks.length - 1];
-    const blindPoints = calculatePoints(this.blind);
-    playerPoints[lastTrick.winner] += blindPoints;
-
-    // Find winner (lowest points, but must have taken at least one trick)
-    let winner = null;
-    let lowestPoints = Infinity;
-
-    for (const player of this.players) {
-      if (playerTrickCounts[player.id] > 0 && playerPoints[player.id] < lowestPoints) {
-        lowestPoints = playerPoints[player.id];
-        winner = player.id;
+  _calculateFailPoints(hand) {
+    let points = 0;
+    for (const card of hand) {
+      if (card.rank === 'Q') {
+        points += 3;
+      } else if (card.rank === 'J') {
+        points += 2;
+      } else if (card.suit === 'diamonds') {
+        points += 1;
       }
     }
+    return points;
+  }
 
-    // If no one took a trick (impossible but handle it), dealer loses
-    if (!winner) {
-      winner = this.players[this.dealerIndex].id;
+  /**
+   * Score a Schwanzer hand
+   * Everyone passed - hand ends immediately
+   * Loser = player with most fail points (Q=3, J=2, diamonds=1)
+   * If tie: losers get positive points, winners get negative (sum to zero)
+   */
+  _scoreSchwanzer() {
+    // Calculate fail points for each player's dealt hand
+    const playerFailPoints = {};
+    for (const player of this.players) {
+      playerFailPoints[player.id] = this._calculateFailPoints(this.hands[player.id]);
     }
 
-    // Scoring: winner gets +4, everyone else gets -1
+    // Find max fail points
+    const maxFailPoints = Math.max(...Object.values(playerFailPoints));
+
+    // Find all players with max fail points (losers)
+    const losers = this.players.filter(p => playerFailPoints[p.id] === maxFailPoints);
+    const winners = this.players.filter(p => playerFailPoints[p.id] < maxFailPoints);
+
+    // Calculate scores
+    // If tie: losers split positive, winners split negative, sum to zero
+    // Normal: 1 loser gets -4, 4 winners get +1 each
     const scores = {};
-    for (const player of this.players) {
-      scores[player.id] = player.id === winner ? 4 : -1;
+
+    if (losers.length === 1) {
+      // Normal case: 1 loser (-4), 4 winners (+1 each)
+      for (const player of this.players) {
+        if (losers[0].id === player.id) {
+          scores[player.id] = -4;
+        } else {
+          scores[player.id] = 1;
+        }
+      }
+    } else {
+      // Tie case: points must sum to zero
+      // Each loser gets positive points, each winner gets negative
+      // Total distributed = 4, split among losers and winners
+      const loserScore = Math.floor(4 / losers.length);
+      const totalLoserPoints = loserScore * losers.length;
+      const winnerScore = winners.length > 0 ? -Math.floor(totalLoserPoints / winners.length) : 0;
+
+      for (const player of this.players) {
+        if (playerFailPoints[player.id] === maxFailPoints) {
+          scores[player.id] = loserScore;
+        } else {
+          scores[player.id] = winnerScore;
+        }
+      }
     }
 
     return {
       type: 'schwanzer',
-      winner,
-      winningPoints: lowestPoints,
-      blindPoints,
-      lastTrickWinner: lastTrick.winner,
+      losers: losers.map(p => p.id),
+      winners: winners.map(p => p.id),
+      maxFailPoints,
       scores,
-      playerPoints,
-      playerTrickCounts,
-      tricksWon: { ...this.tricksWon }
+      playerFailPoints
     };
   }
 
@@ -645,9 +859,17 @@ class SheepsheadGame {
       picker: this.picker,
       partner: this.partner, // Only set once revealed
       calledSuit: this.calledSuit,
+      calledRank: this.calledRank,
+      isUnderCall: this.isUnderCall,
+      underCardPlayed: this.underCardPlayed,
       isSchwanzer: this.isSchwanzer,
       myIndex: player.seatIndex
     };
+
+    // Only show under card info to the picker
+    if (playerId === this.picker && this.underCardId && !this.underCardPlayed) {
+      state.underCardId = this.underCardId;
+    }
 
     // Phase-specific data
     if (this.phase === PHASES.PICKING) {
@@ -666,19 +888,36 @@ class SheepsheadGame {
     if (this.phase === PHASES.PLAYING || this.phase === PHASES.SCHWANZER) {
       const isMyTurn = this.players[this.currentPlayerIndex]?.id === playerId;
       if (isMyTurn) {
-        state.playableCards = getPlayableCards(
-          this.hands[playerId],
-          this.currentTrick,
-          this.calledSuit,
-          this.calledSuit && this.calledSuitFirstTrick &&
-            this.currentTrick.length > 0 &&
-            getEffectiveSuit(this.currentTrick[0].card) === this.calledSuit
-        ).map(c => c.id);
+        // Check if picker must play under card this turn (called suit is led)
+        const isLeading = this.currentTrick.length === 0;
+        const leadSuit = isLeading ? null : getEffectiveSuit(this.currentTrick[0].card);
+        const mustPlayUnderCard = this.isUnderCall &&
+          this.underCardId &&
+          !this.underCardPlayed &&
+          playerId === this.picker &&
+          !isLeading &&
+          leadSuit === this.calledSuit;
+
+        if (mustPlayUnderCard) {
+          // Picker must play their under card - it's the only playable card
+          state.mustPlayUnderCard = true;
+          state.playableCards = [this.underCardId];
+        } else {
+          state.playableCards = getPlayableCards(
+            this.hands[playerId],
+            this.currentTrick,
+            this.calledSuit,
+            this.calledSuit && this.calledSuitFirstTrick &&
+              this.currentTrick.length > 0 &&
+              getEffectiveSuit(this.currentTrick[0].card) === this.calledSuit
+          ).map(c => c.id);
+        }
       }
     }
 
     if (this.phase === PHASES.SCORING) {
       state.results = this.handResults;
+      state.playersLeaving = this.getLeavingPlayerNames();
     }
 
     return state;
@@ -697,6 +936,32 @@ class SheepsheadGame {
         seatIndex: p.seatIndex
       }))
     };
+  }
+
+  /**
+   * Mark a player as wanting to leave after this hand
+   */
+  markPlayerLeaving(playerId) {
+    if (!this.playersLeaving.includes(playerId)) {
+      this.playersLeaving.push(playerId);
+    }
+    return { success: true, playersLeaving: this.playersLeaving };
+  }
+
+  /**
+   * Check if any players are leaving and should end the session
+   */
+  hasPlayersLeaving() {
+    return this.playersLeaving.length > 0;
+  }
+
+  /**
+   * Get list of leaving players' names
+   */
+  getLeavingPlayerNames() {
+    return this.playersLeaving
+      .map(id => this.players.find(p => p.id === id)?.name)
+      .filter(Boolean);
   }
 }
 

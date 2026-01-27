@@ -276,39 +276,49 @@ body {
   aspect-ratio: 16/10;
 }
 
-/* Player positions around the table */
+/* Player positions around the table - clock face layout */
 .player-position {
   position: absolute;
   text-align: center;
-  min-width: 120px;
+  min-width: 100px;
 }
 
-.player-position.top {
-  top: 5%;
+/* Bottom - current player (6 o'clock) */
+.player-position.pos-bottom {
+  bottom: 2%;
   left: 50%;
   transform: translateX(-50%);
 }
 
-.player-position.left {
-  top: 50%;
+/* 8 o'clock position */
+.player-position.pos-8oclock {
+  bottom: 25%;
   left: 5%;
-  transform: translateY(-50%);
 }
 
-.player-position.right {
-  top: 50%;
+/* 10:30 position */
+.player-position.pos-1030 {
+  top: 15%;
+  left: 12%;
+}
+
+/* Top - 12 o'clock */
+.player-position.pos-top {
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* 1:30 position */
+.player-position.pos-130 {
+  top: 15%;
+  right: 12%;
+}
+
+/* 4 o'clock position (unused with 5 players but defined for completeness) */
+.player-position.pos-4oclock {
+  bottom: 25%;
   right: 5%;
-  transform: translateY(-50%);
-}
-
-.player-position.bottom-left {
-  bottom: 10%;
-  left: 20%;
-}
-
-.player-position.bottom-right {
-  bottom: 10%;
-  right: 20%;
 }
 
 .player-box {
@@ -329,6 +339,11 @@ body {
 
 .player-box.is-partner {
   background: rgba(0, 128, 0, 0.3);
+}
+
+.player-box.is-me {
+  background: rgba(0, 100, 200, 0.3);
+  border: 1px solid rgba(100, 150, 255, 0.5);
 }
 
 .player-name {
@@ -366,28 +381,62 @@ body {
   text-align: center;
 }
 
-.trick-area {
+
+/* Played cards appear near each player */
+.played-card-area {
   display: flex;
-  gap: 10px;
   justify-content: center;
-  flex-wrap: wrap;
-  min-height: 100px;
+  margin-top: 8px;
 }
 
-.trick-card {
+.played-card-area .card {
+  cursor: default;
+  transform: none;
+}
+
+.played-card-area .card:hover {
+  transform: none;
+}
+
+/* Under card styling */
+.under-card {
   position: relative;
+  border: 2px solid #f66 !important;
+  box-shadow: 0 0 8px rgba(255, 100, 100, 0.5) !important;
 }
 
-.trick-card .card-owner {
+.under-label {
   position: absolute;
-  bottom: -20px;
+  bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
-  white-space: nowrap;
-  background: rgba(0,0,0,0.7);
-  padding: 2px 5px;
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  font-size: 8px;
+  font-weight: bold;
+  padding: 1px 4px;
   border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.under-card-played {
+  border: 2px dashed #f66;
+}
+
+.under-card-message {
+  background: rgba(255, 100, 100, 0.3);
+  color: #faa;
+  padding: 8px 15px;
+  border-radius: 5px;
+  margin-left: 20px;
+  font-size: 14px;
+}
+
+.action-hint {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 5px;
+  font-style: italic;
 }
 
 .action-area {
@@ -593,6 +642,22 @@ body {
 
 .score-item .score-value.negative {
   color: var(--danger);
+}
+
+.scoring-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.players-leaving {
+  background: rgba(220, 53, 69, 0.2);
+  border: 1px solid rgba(220, 53, 69, 0.5);
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  font-size: 14px;
 }
 
 .waiting-players {

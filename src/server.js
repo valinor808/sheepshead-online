@@ -276,6 +276,12 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Check if Schwanzer (everyone passed) - hand completes immediately
+    if (result.schwanzer && result.handComplete) {
+      updatePlayerStats(game, result.results);
+      io.to(game.roomId).emit('handComplete', result.results);
+    }
+
     broadcastGameState(game);
   });
 
@@ -307,9 +313,14 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const result = game.callAce(playerId, data.suit, data.goAlone);
+    const result = game.callAce(playerId, data.suit, data.goAlone, data.underCardId);
 
     if (!result.success) {
+      // If needs under card, send back the requirement
+      if (result.needsUnderCard) {
+        socket.emit('needsUnderCard', { suit: data.suit });
+        return;
+      }
       socket.emit('error', { message: result.error });
       return;
     }
@@ -369,6 +380,22 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Check if any players want to leave
+    if (game.hasPlayersLeaving()) {
+      const leavingNames = game.getLeavingPlayerNames();
+      // Reset game to waiting state
+      game.resetToWaiting();
+      game.playersLeaving = []; // Clear leaving list
+
+      // Notify all players that session ended
+      io.to(game.roomId).emit('sessionEnded', {
+        message: `${leavingNames.join(', ')} left the table. Returning to lobby.`
+      });
+
+      broadcastGameState(game);
+      return;
+    }
+
     const result = game.startHand();
 
     if (!result.success) {
@@ -379,8 +406,68 @@ io.on('connection', (socket) => {
     broadcastGameState(game);
   });
 
+  socket.on('leaveTable', () => {
+    const playerId = 'user_' + oderId;
+    const game = roomManager.getPlayerRoom(playerId);
+
+    if (!game) {
+      socket.emit('error', { message: 'Not in a room' });
+      return;
+    }
+
+    if (game.phase !== PHASES.SCORING) {
+      socket.emit('error', { message: 'Can only leave table after hand is complete' });
+      return;
+    }
+
+    const result = game.markPlayerLeaving(playerId);
+
+    // Broadcast updated state so everyone sees who is leaving
+    io.to(game.roomId).emit('playerLeavingTable', {
+      playerId,
+      displayName,
+      playersLeaving: game.getLeavingPlayerNames()
+    });
+
+    broadcastGameState(game);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected: ' + displayName);
+
+    // Auto-leave room on disconnect
+    const playerId = 'user_' + oderId;
+    const game = roomManager.getPlayerRoom(playerId);
+
+    if (game) {
+      const roomId = game.roomId;
+      const result = roomManager.leaveRoom(playerId);
+
+      // Notify remaining players
+      socket.to(roomId).emit('playerLeft', { playerId, displayName });
+
+      const updatedGame = roomManager.getRoom(roomId);
+      if (updatedGame) {
+        // If game was reset, broadcast new state to all players
+        if (result.gameReset) {
+          io.to(roomId).emit('gameReset', { message: `${displayName} left - game reset` });
+        }
+
+        io.to(roomId).emit('roomUpdate', {
+          players: updatedGame.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
+          phase: updatedGame.phase
+        });
+
+        // Broadcast updated game state to remaining players
+        for (const player of updatedGame.players) {
+          const playerSocket = findSocketByPlayerId(player.id);
+          if (playerSocket) {
+            playerSocket.emit('gameState', updatedGame.getStateForPlayer(player.id));
+          }
+        }
+      }
+    }
+
     socketUsers.delete(socket.id);
   });
 

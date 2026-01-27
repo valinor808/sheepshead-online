@@ -5,8 +5,23 @@ class GameUI {
     this.socket = socket;
     this.state = null;
     this.selectedCards = [];
+    this.pendingUnderCall = null; // {suit, rank} when selecting hole card
 
     this.setupEventListeners();
+    this.setupBeforeUnloadWarning();
+  }
+
+  setupBeforeUnloadWarning() {
+    window.addEventListener('beforeunload', (e) => {
+      // Only warn if in an active game (not waiting, not scoring)
+      if (this.state && this.state.phase &&
+          this.state.phase !== 'waiting' && this.state.phase !== 'scoring') {
+        e.preventDefault();
+        // Modern browsers ignore custom messages, but this triggers the dialog
+        e.returnValue = 'Game in progress. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    });
   }
 
   setupEventListeners() {
@@ -19,6 +34,9 @@ class GameUI {
     this.socket.on('playerLeft', (data) => this.handlePlayerLeft(data));
     this.socket.on('roomUpdate', (data) => this.handleRoomUpdate(data));
     this.socket.on('error', (data) => this.handleError(data));
+    this.socket.on('gameReset', (data) => this.handleGameReset(data));
+    this.socket.on('playerLeavingTable', (data) => this.handlePlayerLeavingTable(data));
+    this.socket.on('sessionEnded', (data) => this.handleSessionEnded(data));
 
     // UI events
     document.getElementById('start-game-btn').addEventListener('click', () => {
@@ -28,6 +46,10 @@ class GameUI {
     document.getElementById('new-hand-btn').addEventListener('click', () => {
       this.socket.emit('newHand');
       document.getElementById('scoring-overlay').classList.add('hidden');
+    });
+
+    document.getElementById('leave-table-btn').addEventListener('click', () => {
+      this.socket.emit('leaveTable');
     });
 
     document.getElementById('leave-room-btn').addEventListener('click', () => {
@@ -46,6 +68,10 @@ class GameUI {
     console.log('Players in state:', state?.players?.length, state?.players);
     this.state = state;
     this.selectedCards = [];
+    // Reset pending under call if we moved past calling phase
+    if (state.phase !== 'calling') {
+      this.pendingUnderCall = null;
+    }
     this.render();
   }
 
@@ -119,6 +145,30 @@ class GameUI {
       return;
     }
     alert(data.message);
+  }
+
+  handleGameReset(data) {
+    console.log('Game reset:', data);
+    alert(data.message);
+    // Hide scoring overlay if visible
+    document.getElementById('scoring-overlay').classList.add('hidden');
+  }
+
+  handlePlayerLeavingTable(data) {
+    console.log('Player leaving table:', data);
+    // Update the leaving players display in the scoring overlay
+    const leavingEl = document.getElementById('players-leaving');
+    if (leavingEl && data.playersLeaving && data.playersLeaving.length > 0) {
+      leavingEl.textContent = `Leaving after this hand: ${data.playersLeaving.join(', ')}`;
+      leavingEl.classList.remove('hidden');
+    }
+  }
+
+  handleSessionEnded(data) {
+    console.log('Session ended:', data);
+    alert(data.message);
+    document.getElementById('scoring-overlay').classList.add('hidden');
+    // State will be updated by gameState event
   }
 
   render() {
@@ -198,50 +248,42 @@ class GameUI {
 
   renderPlayers() {
     // Map seat indices to position elements
-    // My seat is always at the bottom center conceptually
-    // Other players wrap around
+    // My seat is always at the bottom (position 0)
+    // Other players wrap around clockwise: 8oclock, 10:30, 12oclock, 1:30
 
     const myIndex = this.state.myIndex;
-    const positions = ['top', 'left', 'right', 'bottom-left', 'bottom-right'];
 
     // Clear all positions
     for (let i = 0; i < 5; i++) {
       const el = document.getElementById(`player-pos-${i}`);
-      el.innerHTML = '';
+      if (el) el.innerHTML = '';
     }
 
     // Place players relative to me
     for (const player of this.state.players) {
-      // Calculate relative position (0 = me, 1 = left, 2 = across-left, etc.)
+      // Calculate relative position (0 = me, 1-4 = others clockwise)
       let relPos = (player.seatIndex - myIndex + 5) % 5;
 
-      // Skip position 0 (that's me, shown in hand area)
-      if (relPos === 0) continue;
+      // Map relative position to visual position
+      // 0 = bottom (me), 1 = 8oclock, 2 = 10:30, 3 = top, 4 = 1:30
+      const posIndex = relPos;
 
-      // Map to visual positions
-      const positionMap = {
-        1: 3,  // bottom-left
-        2: 1,  // left
-        3: 0,  // top
-        4: 2   // right
-      };
-
-      const posIndex = positionMap[relPos];
       const el = document.getElementById(`player-pos-${posIndex}`);
+      if (!el) continue;
 
       const isCurrentPlayer = this.state.players[this.state.currentPlayerIndex]?.id === player.id;
+      const isMe = relPos === 0;
 
       let roleText = '';
       if (player.isPicker) roleText = 'Picker';
       else if (player.isPartner) roleText = 'Partner';
 
       el.innerHTML = `
-        <div class="player-box ${isCurrentPlayer ? 'current-turn' : ''} ${player.isPicker ? 'is-picker' : ''} ${player.isPartner ? 'is-partner' : ''}">
+        <div class="player-box ${isCurrentPlayer ? 'current-turn' : ''} ${player.isPicker ? 'is-picker' : ''} ${player.isPartner ? 'is-partner' : ''} ${isMe ? 'is-me' : ''}">
           <div class="player-name">
-            ${player.name}
+            ${player.name}${isMe ? ' (You)' : ''}
             ${player.isDealer ? '<span class="dealer-chip">D</span>' : ''}
           </div>
-          <div class="player-cards-count">${player.cardCount} cards</div>
           ${roleText ? `<div class="player-role">${roleText}</div>` : ''}
           <div class="player-tricks">${player.tricksWon} tricks</div>
         </div>
@@ -250,13 +292,39 @@ class GameUI {
   }
 
   renderTrick() {
-    const container = document.getElementById('trick-area');
-    container.innerHTML = '';
+    // Clear any existing played cards from player positions
+    document.querySelectorAll('.played-card-area').forEach(el => el.remove());
+
+    const myIndex = this.state.myIndex;
 
     for (const play of this.state.currentTrick) {
       const player = this.state.players.find(p => p.id === play.playerId);
-      const cardEl = createTrickCard(play.card, player?.name || 'Unknown');
-      container.appendChild(cardEl);
+      if (!player) continue;
+
+      // Calculate relative position
+      const relPos = (player.seatIndex - myIndex + 5) % 5;
+
+      // Find the player position element
+      const playerPosEl = document.getElementById(`player-pos-${relPos}`);
+      if (!playerPosEl) continue;
+
+      // Create card element for the played card
+      const cardWrapper = document.createElement('div');
+      cardWrapper.className = 'played-card-area';
+
+      let cardEl;
+      if (play.isUnderCard) {
+        // Under card is shown face-down
+        cardEl = createCardBack({ small: true });
+        cardEl.classList.add('under-card-played');
+        cardEl.title = 'Under card (face down)';
+      } else {
+        cardEl = createCardElement(play.card, { small: true });
+      }
+      cardWrapper.appendChild(cardEl);
+
+      // Position the card near the player
+      playerPosEl.appendChild(cardWrapper);
     }
   }
 
@@ -267,9 +335,27 @@ class GameUI {
     const playable = this.state.playableCards || [];
     const isMyTurn = this.state.players[this.state.currentPlayerIndex]?.seatIndex === this.state.myIndex;
     const inPlayPhase = this.state.phase === 'playing' || this.state.phase === 'schwanzer';
+    const inCallingPhase = this.state.phase === 'calling';
+    const selectingUnderCard = inCallingPhase && this.pendingUnderCall;
+
+    // Get the under card ID if picker has one that hasn't been played
+    const underCardId = this.state.underCardId;
+    const underCardPlayed = this.state.underCardPlayed;
 
     for (const card of this.state.hand) {
-      const isPlayable = inPlayPhase && isMyTurn && playable.includes(card.id);
+      let isPlayable = false;
+      let isClickable = false;
+      const isUnderCard = underCardId && card.id === underCardId && !underCardPlayed;
+
+      if (selectingUnderCard) {
+        // All cards are clickable when selecting under card
+        isClickable = true;
+        isPlayable = true; // Show as playable for visual feedback
+      } else if (inPlayPhase && isMyTurn) {
+        isPlayable = playable.includes(card.id);
+        isClickable = isPlayable;
+      }
+
       const isSelected = this.selectedCards.includes(card.id);
 
       const cardEl = createCardElement(card, {
@@ -277,8 +363,25 @@ class GameUI {
         selected: isSelected
       });
 
-      cardEl.addEventListener('click', () => this.handleCardClick(card, isPlayable));
+      // Mark the under card visually
+      if (isUnderCard) {
+        cardEl.classList.add('under-card');
+        const underLabel = document.createElement('div');
+        underLabel.className = 'under-label';
+        underLabel.textContent = 'UNDER';
+        cardEl.appendChild(underLabel);
+      }
+
+      cardEl.addEventListener('click', () => this.handleCardClick(card, isClickable));
       container.appendChild(cardEl);
+    }
+
+    // Show message if must play under card this turn
+    if (this.state.mustPlayUnderCard) {
+      const underMsg = document.createElement('div');
+      underMsg.className = 'under-card-message';
+      underMsg.textContent = 'You must play your under card (called suit was led)';
+      container.appendChild(underMsg);
     }
   }
 
@@ -293,6 +396,15 @@ class GameUI {
       }
       this.renderHand();
       this.renderActionArea();
+    } else if (this.state.phase === 'calling' && this.pendingUnderCall) {
+      // Selecting under card for under call
+      this.socket.emit('callAce', {
+        suit: this.pendingUnderCall.suit,
+        goAlone: false,
+        underCardId: card.id
+      });
+      this.pendingUnderCall = null;
+      this.selectedCards = [];
     } else if (isPlayable) {
       // Play the card
       this.socket.emit('playCard', card.id);
@@ -314,10 +426,11 @@ class GameUI {
     }
 
     if (this.state.calledSuit) {
-      calledInfo.innerHTML = `Called: ${getSuitDisplay(this.state.calledSuit)}`;
+      const underLabel = this.state.isUnderCall ? ' (Under)' : '';
+      calledInfo.innerHTML = `Called: ${getSuitDisplay(this.state.calledSuit)}${underLabel}`;
       if (this.state.partner) {
         const partner = this.state.players.find(p => p.id === this.state.partner);
-        calledInfo.innerHTML += ` (${partner?.name})`;
+        calledInfo.innerHTML += ` - ${partner?.name}`;
       }
     } else {
       calledInfo.textContent = '';
@@ -379,13 +492,23 @@ class GameUI {
     if (this.state.phase === 'calling' && this.state.callableOptions && myPlayer.id === this.state.picker) {
       container.classList.remove('hidden');
 
+      // Check if we're in under card selection mode
+      if (this.pendingUnderCall) {
+        container.innerHTML = `
+          <div class="action-message">Select a card to be your "under" card</div>
+          <div class="action-hint">This card will be played face-down when ${SUIT_SYMBOLS[this.pendingUnderCall.suit]} is led and cannot win the trick</div>
+        `;
+        return;
+      }
+
       let buttonsHtml = '';
       for (const opt of this.state.callableOptions.options) {
         const symbol = SUIT_SYMBOLS[opt.suit];
+        const rankLabel = opt.rank || 'A';
         const warning = opt.type === 'under' ? ' (Under)' : '';
         buttonsHtml += `
-          <button class="btn suit-btn ${opt.suit}" data-suit="${opt.suit}">
-            ${symbol} Ace${warning}
+          <button class="btn suit-btn ${opt.suit}" data-suit="${opt.suit}" data-rank="${rankLabel}" data-type="${opt.type}">
+            ${symbol} ${rankLabel === '10' ? '10' : 'Ace'}${warning}
           </button>
         `;
       }
@@ -394,14 +517,28 @@ class GameUI {
         buttonsHtml += `<button class="btn" id="go-alone-btn">Go Alone</button>`;
       }
 
+      const mustSelectUnderCard = this.state.callableOptions.mustSelectUnderCard;
+      const messageText = mustSelectUnderCard ?
+        'Call a card (Under - you must select an under card after)' :
+        'Call an Ace';
+
       container.innerHTML = `
-        <div class="action-message">Call an Ace</div>
+        <div class="action-message">${messageText}</div>
         <div class="action-buttons">${buttonsHtml}</div>
       `;
 
       container.querySelectorAll('.suit-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          this.socket.emit('callAce', { suit: btn.dataset.suit, goAlone: false });
+          const isUnder = btn.dataset.type === 'under' || mustSelectUnderCard;
+          if (isUnder) {
+            // Need to select under card first
+            this.pendingUnderCall = { suit: btn.dataset.suit, rank: btn.dataset.rank };
+            this.selectedCards = [];
+            this.renderActionArea();
+            this.renderHand(); // Re-render to enable card selection
+          } else {
+            this.socket.emit('callAce', { suit: btn.dataset.suit, goAlone: false });
+          }
         });
       });
 
@@ -419,16 +556,40 @@ class GameUI {
     const title = document.getElementById('scoring-title');
     const details = document.getElementById('scoring-details');
     const scores = document.getElementById('scoring-scores');
+    const leavingEl = document.getElementById('players-leaving');
 
     overlay.classList.remove('hidden');
 
+    // Reset leaving players display
+    if (leavingEl) {
+      leavingEl.classList.add('hidden');
+      leavingEl.textContent = '';
+    }
+
     if (results.type === 'schwanzer') {
-      const winner = this.state.players.find(p => p.id === results.winner);
-      title.textContent = 'Schwanzer Complete!';
-      details.innerHTML = `
-        <p><strong>${winner?.name}</strong> wins with ${results.winningPoints} points!</p>
-        <p>Blind (${results.blindPoints} pts) went to last trick winner.</p>
-      `;
+      const losers = results.losers.map(id => this.state.players.find(p => p.id === id)?.name).join(', ');
+      const isTie = results.losers.length > 1;
+
+      title.textContent = 'Schwanzer!';
+
+      let detailsHtml = '<p>Everyone passed - hand ends immediately!</p>';
+      if (isTie) {
+        detailsHtml += `<p><strong>Tied for most fail points (${results.maxFailPoints}):</strong> ${losers}</p>`;
+        detailsHtml += `<p>Tied losers win, others lose!</p>`;
+      } else {
+        detailsHtml += `<p><strong>Loser:</strong> ${losers} (${results.maxFailPoints} fail points)</p>`;
+      }
+      detailsHtml += `<p class="schwanzer-note"><em>Fail points: Queens=3, Jacks=2, Diamonds=1</em></p>`;
+
+      // Show fail points breakdown
+      detailsHtml += '<div class="fail-points-breakdown"><strong>Fail points:</strong><br>';
+      for (const player of this.state.players) {
+        const fp = results.playerFailPoints[player.id];
+        detailsHtml += `${player.name}: ${fp} | `;
+      }
+      detailsHtml = detailsHtml.slice(0, -3) + '</div>';
+
+      details.innerHTML = detailsHtml;
     } else {
       const picker = this.state.players.find(p => p.id === results.picker);
       const partner = results.partner ? this.state.players.find(p => p.id === results.partner) : null;
@@ -442,8 +603,8 @@ class GameUI {
       let detailsHtml = `
         <p><strong>Picker:</strong> ${picker?.name}</p>
         ${partner ? `<p><strong>Partner:</strong> ${partner.name} (${results.calledSuit} Ace)</p>` : '<p><strong>Going Alone</strong></p>'}
-        <p><strong>Picking Team:</strong> ${results.pickingPoints} points</p>
-        <p><strong>Defenders:</strong> ${results.defendingPoints} points</p>
+        <p><strong>Picking Team:</strong> ${results.pickingPoints} points (${results.pickingTeamTricks} tricks)</p>
+        <p><strong>Defenders:</strong> ${results.defendingPoints} points (${results.defendingTeamTricks} tricks)</p>
         <p><strong>Buried:</strong> ${results.buriedPoints} points</p>
       `;
       details.innerHTML = detailsHtml;

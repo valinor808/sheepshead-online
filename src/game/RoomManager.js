@@ -80,7 +80,7 @@ class RoomManager {
       }
     }
 
-    return result;
+    return { ...result, roomId };
   }
 
   /**

@@ -16,8 +16,10 @@ async function checkAuth() {
       const data = await res.json();
       showLobby(data.user.displayName, data.stats);
     }
+    // 401 is expected when not logged in - no action needed
   } catch (err) {
-    console.log('Not logged in');
+    // Network error - user is likely offline
+    console.log('Auth check failed:', err.message);
   }
 }
 

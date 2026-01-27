@@ -84,11 +84,12 @@
       </header>
 
       <div class="game-table">
-        <div class="player-position top" id="player-pos-0"></div>
-        <div class="player-position left" id="player-pos-1"></div>
-        <div class="player-position right" id="player-pos-2"></div>
-        <div class="player-position bottom-left" id="player-pos-3"></div>
-        <div class="player-position bottom-right" id="player-pos-4"></div>
+        <!-- Clock positions: 0=bottom(me), 1=8oclock, 2=10:30, 3=12oclock, 4=1:30, 5=4oclock -->
+        <div class="player-position pos-bottom" id="player-pos-0"></div>
+        <div class="player-position pos-8oclock" id="player-pos-1"></div>
+        <div class="player-position pos-1030" id="player-pos-2"></div>
+        <div class="player-position pos-top" id="player-pos-3"></div>
+        <div class="player-position pos-130" id="player-pos-4"></div>
 
         <div class="table-center">
           <div id="trick-area" class="trick-area"></div>
@@ -113,7 +114,11 @@
           <h2 id="scoring-title"></h2>
           <div id="scoring-details"></div>
           <div id="scoring-scores"></div>
-          <button id="new-hand-btn" class="btn primary">Next Hand</button>
+          <div id="players-leaving" class="players-leaving hidden"></div>
+          <div class="scoring-buttons">
+            <button id="new-hand-btn" class="btn primary">Next Hand</button>
+            <button id="leave-table-btn" class="btn danger">Leave Table</button>
+          </div>
         </div>
       </div>
 
