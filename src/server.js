@@ -307,10 +307,9 @@ io.on('connection', (socket) => {
     const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
     currentRooms.forEach(r => socket.leave(r));
 
-    const game = roomManager.getRoom(roomId) || roomManager.createRoom(roomId);
-
     if (asKibbitzer) {
       // Join as kibbitzer (spectator)
+      const game = roomManager.getRoom(roomId) || roomManager.createRoom(roomId);
       const result = game.addKibbitzer(playerId, displayName);
 
       if (!result.success) {
@@ -338,6 +337,8 @@ io.on('connection', (socket) => {
       }
 
       socket.join(roomId);
+
+      const game = roomManager.getRoom(roomId);
 
       // Reset voting state when a new player joins (they shouldn't see stale voting data)
       game.resetVoting();
