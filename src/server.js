@@ -93,7 +93,12 @@ function tabIsolationMiddleware(req, res, next) {
   req.session = new Proxy(originalSession, {
     get(target, prop) {
       // Special properties that should use original session
-      if (prop === 'save' || prop === 'destroy' || prop === 'regenerate' || prop === 'reload' || prop === 'touch' || prop === 'cookie' || prop === 'id') {
+      if (prop === 'save' || prop === 'destroy' || prop === 'regenerate' || prop === 'reload' || prop === 'touch') {
+        // Bind methods to the original session object to preserve 'this' context
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      if (prop === 'cookie' || prop === 'id') {
         return target[prop];
       }
       // Use tab-specific storage for user data
