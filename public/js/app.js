@@ -155,6 +155,13 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   gameScreen.classList.add('hidden');
   authScreen.classList.remove('hidden');
 
+  // Clear all form fields for security
+  document.getElementById('login-password').value = '';
+  document.getElementById('register-username').value = '';
+  document.getElementById('register-displayname').value = '';
+  document.getElementById('register-password').value = '';
+  document.getElementById('register-password-confirm').value = '';
+
   // Always show login form (not registration)
   document.getElementById('register-form').classList.add('hidden');
   document.getElementById('login-form').classList.remove('hidden');
