@@ -319,6 +319,24 @@ class SheepsheadGame {
     // Calculate what remains after burying
     const remainingHand = hand.filter(c => !cardIds.includes(c.id));
 
+    // Rule: For each fail suit where you don't have the ace, you must keep at least one non-ace fail card
+    // This ensures you have a "hold card" for suits you might call
+    for (const suit of FAIL_SUITS) {
+      // Check if we have the ace of this suit in remaining hand
+      const hasAce = remainingHand.some(c => c.suit === suit && c.rank === 'A' && !isTrump(c));
+
+      if (!hasAce) {
+        // We don't have the ace - check if we have non-ace fail cards in this suit
+        const allNonAceInSuit = hand.filter(c => c.suit === suit && c.rank !== 'A' && !isTrump(c));
+        const remainingNonAceInSuit = remainingHand.filter(c => c.suit === suit && c.rank !== 'A' && !isTrump(c));
+
+        // If we had any non-ace cards in this suit, we must keep at least one
+        if (allNonAceInSuit.length > 0 && remainingNonAceInSuit.length === 0) {
+          return { success: false, error: `Must keep at least one ${suit} card (hold card for calling that suit)` };
+        }
+      }
+    }
+
     // Get fail cards in remaining hand (non-trump cards)
     const remainingFailCards = remainingHand.filter(c => !isTrump(c));
     const remainingFailAces = remainingFailCards.filter(c => c.rank === 'A');
@@ -329,17 +347,8 @@ class SheepsheadGame {
     const allFailAces = allFailCards.filter(c => c.rank === 'A');
     const allNonAceFail = allFailCards.filter(c => c.rank !== 'A');
 
-    // Rule: Must keep at least 1 non-ace fail card if possible
+    // Rule: Must keep at least 1 non-ace fail card if possible (general rule)
     if (remainingNonAceFail.length === 0 && allNonAceFail.length > 0) {
-      // Check if it was possible to keep at least one non-ace fail
-      // They must bury 2 cards. If they have > 2 non-ace fail, they must keep at least 1.
-      // But if they only have 1-2, they can bury all of them if needed.
-      // Actually the rule is: if you CAN keep a non-ace fail, you MUST.
-      // So if remaining has 0 but hand had some, check if any valid bury would keep one.
-
-      // Count how many non-trump non-ace cards we're burying
-      const buryingNonAceFail = toBury.filter(c => !isTrump(c) && c.rank !== 'A');
-
       // If we're burying ALL non-ace fail cards, that's only OK if we had <= 2
       if (allNonAceFail.length > BLIND_SIZE) {
         return { success: false, error: 'Must keep at least one non-ace fail card if possible' };
@@ -426,16 +435,10 @@ class SheepsheadGame {
     }
 
     // Case 2: Picker has at least one fail suit WITHOUT the ace - normal call
-    // They must call one of those suits
+    // They can only call suits where they have at least one card (hold card requirement)
     if (failSuitsWithoutAce.length > 0) {
       for (const suit of failSuitsWithoutAce) {
         options.push({ suit, rank: 'A', type: 'normal' });
-      }
-      // Also allow calling any OTHER fail suit they don't have the ace of
-      for (const suit of FAIL_SUITS) {
-        if (!acesHeld.includes(suit) && !failSuitsWithoutAce.includes(suit)) {
-          options.push({ suit, rank: 'A', type: 'normal' });
-        }
       }
       return { goAlone: false, options, mustSelectUnderCard: false };
     }

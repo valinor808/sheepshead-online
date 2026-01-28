@@ -658,6 +658,32 @@ body {
   line-height: 1.6;
 }
 
+.personal-result {
+  font-size: 1.3rem;
+  font-weight: bold;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 15px 0;
+}
+
+.personal-result.win {
+  background: rgba(40, 167, 69, 0.3);
+  color: var(--success);
+  border: 2px solid var(--success);
+}
+
+.personal-result.lose {
+  background: rgba(220, 53, 69, 0.3);
+  color: var(--danger);
+  border: 2px solid var(--danger);
+}
+
+.personal-result.draw {
+  background: rgba(255, 215, 0, 0.3);
+  color: var(--accent);
+  border: 2px solid var(--accent);
+}
+
 #scoring-scores {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
@@ -773,12 +799,56 @@ body {
   }
 
   .player-position {
-    min-width: 80px;
+    min-width: 60px;
   }
 
   .player-box {
-    padding: 5px 10px;
-    font-size: 12px;
+    padding: 4px 6px;
+    font-size: 10px;
+    min-width: 60px;
+    max-width: 90px;
+  }
+
+  .player-name {
+    font-size: 10px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .player-scores {
+    font-size: 9px;
+    margin-top: 2px;
+  }
+
+  .player-tricks {
+    font-size: 9px;
+  }
+
+  .player-role {
+    font-size: 9px;
+    margin-top: 2px;
+  }
+
+  .dealer-chip {
+    font-size: 8px;
+    padding: 1px 4px;
+    margin-left: 3px;
+  }
+
+  /* Adjust side positions to prevent overlap */
+  .player-position.pos-1 {
+    left: 1%;
+  }
+
+  .player-position.pos-4 {
+    right: 1%;
+  }
+
+  .game-info {
+    font-size: 10px;
+    padding: 5px;
   }
 }
 

@@ -216,6 +216,18 @@ class GameUI {
     document.getElementById('room-name').textContent = `Room: ${this.state.roomId}`;
     document.getElementById('game-phase').textContent = this.getPhaseDisplay();
 
+    // Show/hide Leave button based on phase
+    const leaveBtn = document.getElementById('leave-room-btn');
+    if (leaveBtn) {
+      // Only show Leave button during waiting phase
+      // Hide during all other phases (picking, burying, calling, playing, schwanzer, scoring)
+      if (this.state.phase === 'waiting') {
+        leaveBtn.classList.remove('hidden');
+      } else {
+        leaveBtn.classList.add('hidden');
+      }
+    }
+
     // Render based on phase
     const waitingOverlay = document.getElementById('waiting-overlay');
     const scoringOverlay = document.getElementById('scoring-overlay');
@@ -655,7 +667,22 @@ class GameUI {
 
       title.textContent = 'Schwanzer!';
 
+      // Determine if current player won or lost
+      const myPlayer = this.state.players.find(p => p.seatIndex === this.state.myIndex);
+      const iWon = myPlayer && !results.losers.includes(myPlayer.id);
+
       let detailsHtml = '<p>Everyone passed</p>';
+
+      // Add personal win/loss message
+      if (myPlayer) {
+        if (numLosers === 5) {
+          detailsHtml += '<p class="personal-result draw">Draw - Everyone Tied!</p>';
+        } else {
+          detailsHtml += iWon ?
+            '<p class="personal-result win">You Win!</p>' :
+            '<p class="personal-result lose">You Lost</p>';
+        }
+      }
 
       if (numLosers === 5) {
         detailsHtml += `<p><strong>All players tied with ${maxPoints} Schwanzer Points - Draw!</strong></p>`;

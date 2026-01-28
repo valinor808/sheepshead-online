@@ -81,6 +81,8 @@ document.getElementById('login-form-element').addEventListener('submit', async (
     const data = await res.json();
 
     if (res.ok) {
+      // Remember username for next login
+      localStorage.setItem('lastUsername', username);
       showLobby(data.displayName);
     } else {
       showAuthError(data.error || 'Login failed');
@@ -152,6 +154,10 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   lobbyScreen.classList.add('hidden');
   gameScreen.classList.add('hidden');
   authScreen.classList.remove('hidden');
+
+  // Always show login form (not registration)
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('login-form').classList.remove('hidden');
 });
 
 function showAuthError(message) {
@@ -435,6 +441,12 @@ function joinRoom(roomId) {
 
 // Refresh rooms periodically (every 3 seconds)
 setInterval(loadRooms, 3000);
+
+// Load remembered username
+const lastUsername = localStorage.getItem('lastUsername');
+if (lastUsername) {
+  document.getElementById('login-username').value = lastUsername;
+}
 
 // Initialize
 checkAuth();

@@ -491,7 +491,37 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Mark this player as wanting next hand
+    // Check if anyone has already left
+    const someoneLeavingOrLeft = game.playersLeaving.length > 0 || game.players.length < 5;
+
+    if (someoneLeavingOrLeft) {
+      // Someone left - can't continue with current players
+      // Send THIS player back to waiting room immediately
+      socket.emit('sessionEnded', {
+        message: 'Not enough players to continue. Returning to waiting room.'
+      });
+
+      // Mark this player as voted for next hand (for tracking)
+      game.markPlayerNextHand(playerId);
+
+      // Broadcast updated voting state to other players still on scoring screen
+      socket.to(game.roomId).emit('votingUpdate', {
+        playersNextHand: game.getNextHandPlayerNames(),
+        playersLeaving: game.getLeavingPlayerNames(),
+        allVoted: game.haveAllPlayersVoted()
+      });
+
+      // Check if this was the last player to vote - if so, reset the game
+      if (game.haveAllPlayersVoted()) {
+        game.resetToWaiting();
+        game.resetVoting();
+        broadcastGameState(game);
+      }
+
+      return;
+    }
+
+    // No one has left yet - mark this player as wanting next hand
     const result = game.markPlayerNextHand(playerId);
 
     // Broadcast updated voting state
@@ -515,7 +545,8 @@ io.on('connection', (socket) => {
 
         broadcastGameState(game);
       } else {
-        // At least one player is leaving - end session for remaining players
+        // This shouldn't happen now since we handle leaving differently
+        // but keep it as a fallback
         const leavingNames = game.getLeavingPlayerNames();
         game.resetToWaiting();
         game.resetVoting();
