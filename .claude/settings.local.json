@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "mcp__hubble__track_get_records",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd authentication improvements and session isolation\n\n- Add password confirmation field on registration with validation\n- Enable Enter key submission for login and registration forms\n- Implement tab-based session isolation for multiple simultaneous logins\n- Add CLAUDE.md with project context and guidelines\n\nSession isolation allows multiple users to log in from different tabs/windows\non the same computer without sessions interfering with each other. Each tab\ngets a unique ID stored in sessionStorage, and the server maintains separate\nsession data per tab.\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git config:*)"
     ]
   }
 }

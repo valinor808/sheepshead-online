@@ -64,7 +64,7 @@ document.getElementById('show-login').addEventListener('click', (e) => {
 // Handle login form submission
 document.getElementById('login-form-element').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const username = document.getElementById('login-username').value;
+  const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
 
   try {
@@ -83,7 +83,7 @@ document.getElementById('login-form-element').addEventListener('submit', async (
     if (res.ok) {
       showLobby(data.displayName);
     } else {
-      showAuthError(data.error);
+      showAuthError(data.error || 'Login failed');
     }
   } catch (err) {
     showAuthError('Connection error');
@@ -99,12 +99,12 @@ document.getElementById('login-btn').addEventListener('click', async (e) => {
 // Handle registration form submission
 document.getElementById('register-form-element').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const username = document.getElementById('register-username').value;
-  const displayName = document.getElementById('register-displayname').value;
+  const username = document.getElementById('register-username').value.trim();
+  const displayName = document.getElementById('register-displayname').value.trim();
   const password = document.getElementById('register-password').value;
   const passwordConfirm = document.getElementById('register-password-confirm').value;
 
-  // Validate passwords match
+  // Validate passwords match (no trim - passwords can intentionally have spaces)
   if (password !== passwordConfirm) {
     showAuthError('Passwords do not match');
     return;
@@ -126,7 +126,7 @@ document.getElementById('register-form-element').addEventListener('submit', asyn
     if (res.ok) {
       showLobby(data.displayName);
     } else {
-      showAuthError(data.error);
+      showAuthError(data.error || 'Registration failed');
     }
   } catch (err) {
     showAuthError('Connection error');
@@ -156,7 +156,7 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 function showAuthError(message) {
   const el = document.getElementById('auth-error');
-  el.textContent = message;
+  el.textContent = message || 'An error occurred';
   el.classList.remove('hidden');
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
