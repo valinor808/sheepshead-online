@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__hubble__track_get_records"
+      "mcp__hubble__track_get_records",
+      "Bash(git add:*)"
     ]
   }
 }

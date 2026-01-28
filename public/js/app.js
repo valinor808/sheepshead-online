@@ -17,10 +17,26 @@ const authScreen = document.getElementById('auth-screen');
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 
+// Generate unique tab ID for session isolation
+// This allows multiple users to be logged in from different tabs
+function getTabId() {
+  let tabId = sessionStorage.getItem('tabId');
+  if (!tabId) {
+    tabId = 'tab_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    sessionStorage.setItem('tabId', tabId);
+  }
+  return tabId;
+}
+
+const TAB_ID = getTabId();
+
 // Check if already logged in
 async function checkAuth() {
   try {
-    const res = await fetch('/api/me', { credentials: 'include' });
+    const res = await fetch('/api/me', {
+      credentials: 'include',
+      headers: { 'X-Tab-ID': TAB_ID }
+    });
     if (res.ok) {
       const data = await res.json();
       showLobby(data.user.displayName, data.stats);
@@ -45,14 +61,19 @@ document.getElementById('show-login').addEventListener('click', (e) => {
   document.getElementById('login-form').classList.remove('hidden');
 });
 
-document.getElementById('login-btn').addEventListener('click', async () => {
+// Handle login form submission
+document.getElementById('login-form-element').addEventListener('submit', async (e) => {
+  e.preventDefault();
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
 
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tab-ID': TAB_ID
+      },
       body: JSON.stringify({ username, password }),
       credentials: 'include'
     });
@@ -69,15 +90,33 @@ document.getElementById('login-btn').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('register-btn').addEventListener('click', async () => {
+// Keep button click handler for backwards compatibility
+document.getElementById('login-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  document.getElementById('login-form-element').requestSubmit();
+});
+
+// Handle registration form submission
+document.getElementById('register-form-element').addEventListener('submit', async (e) => {
+  e.preventDefault();
   const username = document.getElementById('register-username').value;
   const displayName = document.getElementById('register-displayname').value;
   const password = document.getElementById('register-password').value;
+  const passwordConfirm = document.getElementById('register-password-confirm').value;
+
+  // Validate passwords match
+  if (password !== passwordConfirm) {
+    showAuthError('Passwords do not match');
+    return;
+  }
 
   try {
     const res = await fetch('/api/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tab-ID': TAB_ID
+      },
       body: JSON.stringify({ username, password, displayName }),
       credentials: 'include'
     });
@@ -94,8 +133,18 @@ document.getElementById('register-btn').addEventListener('click', async () => {
   }
 });
 
+// Keep button click handler for backwards compatibility
+document.getElementById('register-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  document.getElementById('register-form-element').requestSubmit();
+});
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+  await fetch('/api/logout', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-Tab-ID': TAB_ID }
+  });
   if (socket) {
     socket.disconnect();
     socket = null;
@@ -129,8 +178,13 @@ async function showLobby(displayName, stats = null) {
   // Longer delay to ensure session is fully saved before connecting WebSocket
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Connect socket with credentials
-  socket = io({ withCredentials: true });
+  // Connect socket with credentials and tab ID for session isolation
+  socket = io({
+    withCredentials: true,
+    auth: {
+      tabId: TAB_ID
+    }
+  });
 
   // Wait for socket to connect before creating GameUI
   await new Promise((resolve) => {
@@ -249,13 +303,19 @@ function renderStats(stats, isDaily = true) {
 async function loadStats(mode = 'daily') {
   try {
     if (mode === 'daily') {
-      const res = await fetch('/api/stats/daily', { credentials: 'include' });
+      const res = await fetch('/api/stats/daily', {
+        credentials: 'include',
+        headers: { 'X-Tab-ID': TAB_ID }
+      });
       if (res.ok) {
         cachedDailyStats = await res.json();
         renderStats(cachedDailyStats, true);
       }
     } else {
-      const res = await fetch('/api/me', { credentials: 'include' });
+      const res = await fetch('/api/me', {
+        credentials: 'include',
+        headers: { 'X-Tab-ID': TAB_ID }
+      });
       if (res.ok) {
         const data = await res.json();
         cachedLifetimeStats = data.stats;
@@ -269,7 +329,10 @@ async function loadStats(mode = 'daily') {
 
 async function loadRooms() {
   try {
-    const res = await fetch('/api/rooms', { credentials: 'include' });
+    const res = await fetch('/api/rooms', {
+      credentials: 'include',
+      headers: { 'X-Tab-ID': TAB_ID }
+    });
     const rooms = await res.json();
 
     const container = document.getElementById('room-list');
@@ -301,7 +364,10 @@ async function loadRooms() {
 async function loadLeaderboard(mode = 'daily') {
   try {
     const url = mode === 'daily' ? '/api/leaderboard?type=daily' : '/api/leaderboard';
-    const res = await fetch(url, { credentials: 'include' });
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'X-Tab-ID': TAB_ID }
+    });
     const leaders = await res.json();
 
     const container = document.getElementById('leaderboard');

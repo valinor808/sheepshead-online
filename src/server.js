@@ -48,6 +48,10 @@ console.log('Environment:', { IS_PRODUCTION, PORT: process.env.PORT, NODE_ENV: p
 // Always trust proxy since Railway uses a reverse proxy
 app.set('trust proxy', 1);
 
+// Tab-isolated session store
+// Stores session data per tab ID to allow multiple logins from same computer
+const tabSessionStore = new Map();
+
 // Session configuration with memory store
 const sessionMiddleware = session({
   name: 'sheepshead.sid',
@@ -65,10 +69,60 @@ const sessionMiddleware = session({
   }
 });
 
+// Tab isolation middleware
+// Intercepts session access and uses tab-specific storage
+function tabIsolationMiddleware(req, res, next) {
+  const tabId = req.headers['x-tab-id'];
+
+  if (!tabId) {
+    // No tab ID, use default session behavior
+    return next();
+  }
+
+  // Store original session object
+  const originalSession = req.session;
+
+  // Get or create tab-specific session data
+  if (!tabSessionStore.has(tabId)) {
+    tabSessionStore.set(tabId, {});
+  }
+
+  const tabSession = tabSessionStore.get(tabId);
+
+  // Create a proxy that reads/writes to tab-specific storage
+  req.session = new Proxy(originalSession, {
+    get(target, prop) {
+      // Special properties that should use original session
+      if (prop === 'save' || prop === 'destroy' || prop === 'regenerate' || prop === 'reload' || prop === 'touch' || prop === 'cookie' || prop === 'id') {
+        return target[prop];
+      }
+      // Use tab-specific storage for user data
+      return tabSession[prop];
+    },
+    set(target, prop, value) {
+      tabSession[prop] = value;
+      return true;
+    },
+    has(target, prop) {
+      return prop in tabSession;
+    },
+    deleteProperty(target, prop) {
+      delete tabSession[prop];
+      return true;
+    }
+  });
+
+  // Store tabId on request for later use
+  req.tabId = tabId;
+
+  next();
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(sessionMiddleware);
+app.use(tabIsolationMiddleware); // Enable session isolation per tab
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Share session with Socket.IO
@@ -207,16 +261,29 @@ const socketUsers = new Map();
 
 io.on('connection', (socket) => {
   const sess = socket.request.session;
+  const tabId = socket.handshake.auth?.tabId;
+
+  // Apply tab isolation for Socket.IO
+  let userId, displayName;
+
+  if (tabId && tabSessionStore.has(tabId)) {
+    const tabSession = tabSessionStore.get(tabId);
+    userId = tabSession.userId;
+    displayName = tabSession.displayName;
+  } else {
+    // Fall back to regular session if no tab ID
+    userId = sess.userId;
+    displayName = sess.displayName;
+  }
 
   // Check for undefined/null specifically, not falsy (0 is a valid userId)
-  if (!sess || sess.userId === undefined || sess.userId === null) {
+  if (userId === undefined || userId === null) {
     socket.emit('error', { message: 'Not authenticated' });
     socket.disconnect();
     return;
   }
 
-  const oderId = sess.userId; // Note: Variable named for historical reasons
-  const displayName = sess.displayName;
+  const oderId = userId; // Note: Variable named for historical reasons
 
   socketUsers.set(socket.id, { oderId: 'user_' + oderId, displayName, dbId: oderId });
 

@@ -16,18 +16,23 @@
 
         <div id="login-form" class="auth-form">
           <h2>Login</h2>
-          <input type="text" id="login-username" placeholder="Username" autocomplete="username">
-          <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-          <button id="login-btn" class="btn primary">Login</button>
+          <form id="login-form-element">
+            <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+            <button type="submit" id="login-btn" class="btn primary">Login</button>
+          </form>
           <p class="switch-form">Don't have an account? <a href="#" id="show-register">Register</a></p>
         </div>
 
         <div id="register-form" class="auth-form hidden">
           <h2>Register</h2>
-          <input type="text" id="register-username" placeholder="Username (3-20 chars)">
-          <input type="text" id="register-displayname" placeholder="Display Name">
-          <input type="password" id="register-password" placeholder="Password (6+ chars)">
-          <button id="register-btn" class="btn primary">Register</button>
+          <form id="register-form-element">
+            <input type="text" id="register-username" placeholder="Username (3-20 chars)">
+            <input type="text" id="register-displayname" placeholder="Display Name">
+            <input type="password" id="register-password" placeholder="Password (6+ chars)">
+            <input type="password" id="register-password-confirm" placeholder="Confirm Password">
+            <button type="submit" id="register-btn" class="btn primary">Register</button>
+          </form>
           <p class="switch-form">Already have an account? <a href="#" id="show-login">Login</a></p>
         </div>
 
