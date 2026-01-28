@@ -68,14 +68,17 @@ class GameUI {
       this.socket.emit('leaveTable');
     });
 
-    document.getElementById('leave-room-btn').addEventListener('click', () => {
+    document.getElementById('cancel-room-btn').addEventListener('click', () => {
       this.socket.emit('leaveRoom');
       this.showLobby();
     });
 
-    document.getElementById('cancel-room-btn').addEventListener('click', () => {
-      this.socket.emit('leaveRoom');
-      this.showLobby();
+    document.getElementById('show-last-trick-btn').addEventListener('click', () => {
+      this.showLastTrick();
+    });
+
+    document.getElementById('close-last-trick-btn').addEventListener('click', () => {
+      document.getElementById('last-trick-overlay').classList.add('hidden');
     });
   }
 
@@ -171,27 +174,34 @@ class GameUI {
 
   handleVotingUpdate(data) {
     // Update the voting display in the scoring overlay
+    // Show "Left the Table" notifications in red
     this.updateVotingDisplay(data.playersNextHand, data.playersLeaving);
   }
 
   handleReturnToLobby(data) {
+    // Only hide scoring overlay and return to lobby for this player
     document.getElementById('scoring-overlay').classList.add('hidden');
     this.showLobby();
   }
 
   handleSessionEnded(data) {
+    // Player voted "Next Hand" but game can't continue (not enough players)
+    // Hide scoring overlay and show waiting screen
     document.getElementById('scoring-overlay').classList.add('hidden');
-    // State will be updated by gameState event
+    // State will be updated by gameState event to show waiting screen
   }
 
   updateVotingDisplay(playersNextHand = [], playersLeaving = []) {
     const leavingEl = document.getElementById('players-leaving');
     const waitingEl = document.getElementById('players-waiting-next');
 
-    // Show players leaving
+    // Show players leaving with individual notifications
     if (leavingEl) {
       if (playersLeaving.length > 0) {
-        leavingEl.textContent = `Leaving: ${playersLeaving.join(', ')}`;
+        // Show each player who left with "Left the Table: <name>" format
+        leavingEl.innerHTML = playersLeaving.map(name =>
+          `<div class="player-left-notification">Left the Table: ${name}</div>`
+        ).join('');
         leavingEl.classList.remove('hidden');
       } else {
         leavingEl.classList.add('hidden');
@@ -213,20 +223,8 @@ class GameUI {
     if (!this.state) return;
 
     // Update header
-    document.getElementById('room-name').textContent = `Room: ${this.state.roomId}`;
+    document.getElementById('room-name').textContent = `Table: ${this.state.roomId}`;
     document.getElementById('game-phase').textContent = this.getPhaseDisplay();
-
-    // Show/hide Leave button based on phase
-    const leaveBtn = document.getElementById('leave-room-btn');
-    if (leaveBtn) {
-      // Only show Leave button during waiting phase
-      // Hide during all other phases (picking, burying, calling, playing, schwanzer, scoring)
-      if (this.state.phase === 'waiting') {
-        leaveBtn.classList.remove('hidden');
-      } else {
-        leaveBtn.classList.add('hidden');
-      }
-    }
 
     // Render based on phase
     const waitingOverlay = document.getElementById('waiting-overlay');
@@ -255,6 +253,18 @@ class GameUI {
     const leaveTableBtn = document.getElementById('leave-table-btn');
 
     if (!this.state) return;
+
+    // Kibbitzers only see Leave Table button
+    if (this.state.isKibbitzer) {
+      newHandBtn.style.display = 'none';
+      leaveTableBtn.style.display = 'block';
+      leaveTableBtn.disabled = false;
+      return;
+    }
+
+    // Show both buttons for players
+    newHandBtn.style.display = 'block';
+    leaveTableBtn.style.display = 'block';
 
     // Disable buttons if player has already voted
     if (this.state.hasVoted) {
@@ -300,12 +310,38 @@ class GameUI {
       container.appendChild(div);
     }
 
-    // Show start button if we have 5 players
+    // Show start button if we have 5 players (not for kibbitzers)
     const startBtn = document.getElementById('start-game-btn');
-    if (players.length === 5) {
+    if (players.length === 5 && !this.state.isKibbitzer) {
       startBtn.classList.remove('hidden');
     } else {
       startBtn.classList.add('hidden');
+    }
+
+    // Update cancel button text for kibbitzers
+    const cancelBtn = document.getElementById('cancel-room-btn');
+    if (this.state.isKibbitzer) {
+      cancelBtn.textContent = 'Join Table';
+      // For kibbitzers, this button should try to join as player instead of leaving
+      cancelBtn.onclick = () => {
+        // If there's space, attempt to join as player
+        if (players.length < 5) {
+          this.socket.emit('leaveRoom'); // Leave as kibbitzer first
+          setTimeout(() => {
+            this.socket.emit('joinRoom', { roomId: this.state.roomId, asKibbitzer: false });
+          }, 100);
+        } else {
+          // Still full, just leave
+          this.socket.emit('leaveRoom');
+          this.showLobby();
+        }
+      };
+    } else {
+      cancelBtn.textContent = 'Leave Table';
+      cancelBtn.onclick = () => {
+        this.socket.emit('leaveRoom');
+        this.showLobby();
+      };
     }
   }
 
@@ -497,6 +533,7 @@ class GameUI {
     const pickerInfo = document.getElementById('picker-info');
     const calledInfo = document.getElementById('called-suit-info');
     const trickCount = document.getElementById('trick-count');
+    const lastTrickBtn = document.getElementById('show-last-trick-btn');
 
     if (this.state.picker) {
       const picker = this.state.players.find(p => p.id === this.state.picker);
@@ -519,6 +556,13 @@ class GameUI {
     }
 
     trickCount.textContent = `Tricks: ${this.state.tricks.length}/6`;
+
+    // Show/hide last trick button
+    if (this.state.lastTrick && this.state.lastTrick.length > 0) {
+      lastTrickBtn.classList.remove('hidden');
+    } else {
+      lastTrickBtn.classList.add('hidden');
+    }
   }
 
   renderActionArea() {
@@ -737,6 +781,45 @@ class GameUI {
       `;
       scores.appendChild(div);
     }
+  }
+
+  showLastTrick() {
+    if (!this.state || !this.state.lastTrick) return;
+
+    const overlay = document.getElementById('last-trick-overlay');
+    const container = document.getElementById('last-trick-cards');
+    container.innerHTML = '';
+
+    const myIndex = this.state.myIndex;
+
+    for (const play of this.state.lastTrick) {
+      const player = this.state.players.find(p => p.id === play.playerId);
+      if (!player) continue;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'trick-card';
+
+      let cardEl;
+      if (play.isUnderCard) {
+        // Under card is shown face-down
+        cardEl = createCardBack({ small: true });
+        cardEl.classList.add('under-card-played');
+        cardEl.title = 'Under card (face down)';
+      } else {
+        cardEl = createCardElement(play.card, { small: true });
+      }
+      wrapper.appendChild(cardEl);
+
+      const label = document.createElement('span');
+      label.className = 'card-owner';
+      const relPos = (player.seatIndex - myIndex + 5) % 5;
+      label.textContent = player.name + (relPos === 0 ? ' (You)' : '');
+      wrapper.appendChild(label);
+
+      container.appendChild(wrapper);
+    }
+
+    overlay.classList.remove('hidden');
   }
 
   showLobby() {

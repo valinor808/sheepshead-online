@@ -59,6 +59,7 @@ class SheepsheadGame {
   constructor(roomId) {
     this.roomId = roomId;
     this.players = [];          // Array of {id, name, seatIndex}
+    this.kibbitzers = [];       // Array of {id, name} - spectators
     this.hands = {};            // playerId -> array of cards
     this.blind = [];            // The blind (2 cards)
     this.buried = [];           // Cards buried by picker
@@ -85,6 +86,7 @@ class SheepsheadGame {
     this.currentTrick = [];     // Array of {playerId, card, isUnderCard}
     this.tricks = [];           // Completed tricks with winner info
     this.tricksWon = {};        // playerId -> array of tricks won
+    this.lastTrick = null;      // Last completed trick for review
 
     // Schwanzer (leasters) state
     this.isSchwanzer = false;
@@ -93,7 +95,8 @@ class SheepsheadGame {
     this.handResults = null;    // Results of the completed hand
 
     // Session management - end-of-hand voting
-    this.playersLeaving = [];   // Players who clicked "Leave Table"
+    this.playersLeaving = [];   // Player IDs who clicked "Leave Table"
+    this.playersLeavingNames = []; // Names of players who left (persists after removal)
     this.playersNextHand = [];  // Players who clicked "Next Hand"
   }
 
@@ -117,6 +120,33 @@ class SheepsheadGame {
     this.tricksWon[playerId] = [];
 
     return { success: true, seatIndex };
+  }
+
+  /**
+   * Add a kibbitzer (spectator) to the game
+   */
+  addKibbitzer(kibitzerId, kibitzerName) {
+    if (this.kibbitzers.find(k => k.id === kibitzerId)) {
+      return { success: false, error: 'Already kibbitzing' };
+    }
+    if (this.players.find(p => p.id === kibitzerId)) {
+      return { success: false, error: 'Already a player' };
+    }
+
+    this.kibbitzers.push({ id: kibitzerId, name: kibitzerName });
+
+    return { success: true };
+  }
+
+  /**
+   * Remove a kibbitzer from the game
+   */
+  removeKibbitzer(kibitzerId) {
+    const index = this.kibbitzers.findIndex(k => k.id === kibitzerId);
+    if (index === -1) return { success: false, error: 'Kibbitzer not found' };
+
+    this.kibbitzers.splice(index, 1);
+    return { success: true };
   }
 
   /**
@@ -160,6 +190,7 @@ class SheepsheadGame {
     this.calledSuitFirstTrick = true;
     this.currentTrick = [];
     this.tricks = [];
+    this.lastTrick = null;
     this.passedPlayers = [];
     this.isSchwanzer = false;
     this.handResults = null;
@@ -195,6 +226,7 @@ class SheepsheadGame {
     this.calledSuitFirstTrick = true;
     this.currentTrick = [];
     this.tricks = [];
+    this.lastTrick = null;
     this.passedPlayers = [];
     this.isSchwanzer = false;
     this.handResults = null;
@@ -674,6 +706,7 @@ class SheepsheadGame {
     this.tricksWon[winner].push(completedTrick);
 
     const previousTrick = [...this.currentTrick];
+    this.lastTrick = [...this.currentTrick]; // Store for review
     this.currentTrick = [];
 
     // Winner leads next trick
@@ -920,6 +953,52 @@ class SheepsheadGame {
   }
 
   /**
+   * Get the current game state for a kibbitzer (spectator)
+   * Kibbitzers can see played cards but not players' hands
+   */
+  getStateForKibbitzer(kibitzerId) {
+    const kibbitzer = this.kibbitzers.find(k => k.id === kibitzerId);
+    if (!kibbitzer) return null;
+
+    const state = {
+      roomId: this.roomId,
+      phase: this.phase,
+      isKibbitzer: true,
+      players: this.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        seatIndex: p.seatIndex,
+        cardCount: this.hands[p.id]?.length || 0,
+        isDealer: p.seatIndex === this.dealerIndex,
+        isPicker: p.id === this.picker,
+        isPartner: p.id === this.partner,
+        tricksWon: this.tricksWon[p.id]?.length || 0
+      })),
+      hand: [], // Kibbitzers don't have cards
+      currentTrick: this.currentTrick,
+      lastTrick: this.lastTrick,
+      tricks: this.tricks,
+      currentPlayerIndex: this.currentPlayerIndex,
+      dealerIndex: this.dealerIndex,
+      picker: this.picker,
+      partner: this.partner,
+      calledSuit: this.calledSuit,
+      calledRank: this.calledRank,
+      isUnderCall: this.isUnderCall,
+      isSchwanzer: this.isSchwanzer,
+      myIndex: 0 // Kibbitzers have no seat
+    };
+
+    // Voting state for scoring phase
+    if (this.phase === PHASES.SCORING) {
+      state.playersLeaving = this.getLeavingPlayerNames();
+      state.playersNextHand = this.getNextHandPlayerNames();
+    }
+
+    return state;
+  }
+
+  /**
    * Get the current game state for a specific player
    */
   getStateForPlayer(playerId) {
@@ -941,6 +1020,7 @@ class SheepsheadGame {
       })),
       hand: this.hands[playerId] || [],
       currentTrick: this.currentTrick,
+      lastTrick: this.lastTrick,
       tricks: this.tricks,
       currentPlayerIndex: this.currentPlayerIndex,
       dealerIndex: this.dealerIndex,
@@ -1041,6 +1121,11 @@ class SheepsheadGame {
   markPlayerLeaving(playerId) {
     if (!this.playersLeaving.includes(playerId)) {
       this.playersLeaving.push(playerId);
+      // Store name for display after player is removed
+      const player = this.players.find(p => p.id === playerId);
+      if (player && !this.playersLeavingNames.includes(player.name)) {
+        this.playersLeavingNames.push(player.name);
+      }
     }
     // Remove from nextHand if they were there
     this.playersNextHand = this.playersNextHand.filter(id => id !== playerId);
@@ -1094,9 +1179,8 @@ class SheepsheadGame {
    * Get list of leaving players' names
    */
   getLeavingPlayerNames() {
-    return this.playersLeaving
-      .map(id => this.players.find(p => p.id === id)?.name)
-      .filter(Boolean);
+    // Return persisted names (includes players who already left)
+    return this.playersLeavingNames;
   }
 
   /**
@@ -1113,6 +1197,7 @@ class SheepsheadGame {
    */
   resetVoting() {
     this.playersLeaving = [];
+    this.playersLeavingNames = [];
     this.playersNextHand = [];
   }
 }

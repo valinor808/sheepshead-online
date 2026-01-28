@@ -344,7 +344,7 @@ async function loadRooms() {
     const container = document.getElementById('room-list');
 
     if (rooms.length === 0) {
-      container.innerHTML = '<p class="no-rooms">No active rooms. Create one!</p>';
+      container.innerHTML = '<p class="no-rooms">No active tables. Create one!</p>';
       return;
     }
 
@@ -352,13 +352,18 @@ async function loadRooms() {
       // Escape room ID for use in HTML attribute
       const escapedRoomId = room.roomId.replace(/'/g, "\\'").replace(/"/g, '&quot;');
       const displayRoomId = room.roomId.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const isFull = room.playerCount >= 5;
+
       return `
         <div class="room-item">
           <div class="room-info">
             <span class="room-name">${displayRoomId}</span>
             <span class="room-players">${room.players.join(', ')} (${room.playerCount}/5)</span>
           </div>
-          <button class="btn small" onclick="joinRoom('${escapedRoomId}')">Join</button>
+          <div class="room-buttons">
+            <button class="btn small" onclick="joinRoom('${escapedRoomId}')" ${isFull ? 'disabled' : ''}>Join Table</button>
+            ${isFull ? `<button class="btn small kibitz-btn" onclick="joinRoomAsKibbitzer('${escapedRoomId}')">Kibitz</button>` : ''}
+          </div>
         </div>
       `;
     }).join('');
@@ -432,7 +437,17 @@ document.getElementById('room-code').addEventListener('keypress', (e) => {
 function joinRoom(roomId) {
   if (!socket) return;
 
-  socket.emit('joinRoom', roomId);
+  socket.emit('joinRoom', { roomId, asKibbitzer: false });
+
+  // Switch to game screen
+  lobbyScreen.classList.add('hidden');
+  gameScreen.classList.remove('hidden');
+}
+
+function joinRoomAsKibbitzer(roomId) {
+  if (!socket) return;
+
+  socket.emit('joinRoom', { roomId, asKibbitzer: true });
 
   // Switch to game screen
   lobbyScreen.classList.add('hidden');

@@ -34,6 +34,19 @@ const RANK_DISPLAY = {
   'A': 'A'
 };
 
+// Preload all card images to prevent white boxes during initial render
+(function preloadCardImages() {
+  const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const suits = ['D', 'H', 'S', 'C'];
+
+  ranks.forEach(rank => {
+    suits.forEach(suit => {
+      const img = new Image();
+      img.src = `/images/cards/${rank}${suit}.svg`;
+    });
+  });
+})();
+
 // Check if a card is trump
 function isTrump(card) {
   if (card.rank === 'Q' || card.rank === 'J') return true;

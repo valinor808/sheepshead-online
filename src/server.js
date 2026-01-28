@@ -202,6 +202,11 @@ app.post('/api/login', async (req, res) => {
 
 // Logout
 app.post('/api/logout', (req, res) => {
+  // Clear tab-specific session if exists
+  if (req.tabId && tabSessionStore.has(req.tabId)) {
+    tabSessionStore.delete(req.tabId);
+  }
+
   req.session.destroy();
   res.json({ success: true });
 });
@@ -294,37 +299,61 @@ io.on('connection', (socket) => {
 
   console.log('User connected: ' + displayName);
 
-  socket.on('joinRoom', (roomId) => {
+  socket.on('joinRoom', (data) => {
+    const roomId = typeof data === 'string' ? data : data.roomId;
+    const asKibbitzer = typeof data === 'object' ? data.asKibbitzer : false;
     const playerId = 'user_' + oderId;
 
     const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
     currentRooms.forEach(r => socket.leave(r));
 
-    const result = roomManager.joinRoom(roomId, playerId, displayName);
+    const game = roomManager.getRoom(roomId) || roomManager.createRoom(roomId);
 
-    if (!result.success) {
-      socket.emit('error', { message: result.error });
-      return;
+    if (asKibbitzer) {
+      // Join as kibbitzer (spectator)
+      const result = game.addKibbitzer(playerId, displayName);
+
+      if (!result.success) {
+        socket.emit('error', { message: result.error });
+        return;
+      }
+
+      socket.join(roomId);
+
+      // Send kibitzer-specific game state
+      const playerScores = getPlayerScores(game);
+      const state = game.getStateForKibbitzer(playerId);
+      state.playerScores = playerScores;
+      socket.emit('gameState', state);
+
+      // Notify others that a kibbitzer joined
+      socket.to(roomId).emit('kibitzerJoined', { kibitzerId: playerId, displayName });
+    } else {
+      // Join as player
+      const result = roomManager.joinRoom(roomId, playerId, displayName);
+
+      if (!result.success) {
+        socket.emit('error', { message: result.error });
+        return;
+      }
+
+      socket.join(roomId);
+
+      // Reset voting state when a new player joins (they shouldn't see stale voting data)
+      game.resetVoting();
+
+      // Get player scores for all players in the game
+      const playerScores = getPlayerScores(game);
+      const state = game.getStateForPlayer(playerId);
+      state.playerScores = playerScores;
+      socket.emit('gameState', state);
+      socket.to(roomId).emit('playerJoined', { playerId, displayName, seatIndex: result.seatIndex });
+
+      io.to(roomId).emit('roomUpdate', {
+        players: game.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
+        phase: game.phase
+      });
     }
-
-    socket.join(roomId);
-
-    const game = roomManager.getRoom(roomId);
-
-    // Reset voting state when a new player joins (they shouldn't see stale voting data)
-    game.resetVoting();
-
-    // Get player scores for all players in the game
-    const playerScores = getPlayerScores(game);
-    const state = game.getStateForPlayer(playerId);
-    state.playerScores = playerScores;
-    socket.emit('gameState', state);
-    socket.to(roomId).emit('playerJoined', { playerId, displayName, seatIndex: result.seatIndex });
-
-    io.to(roomId).emit('roomUpdate', {
-      players: game.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
-      phase: game.phase
-    });
   });
 
   socket.on('leaveRoom', () => {
@@ -332,17 +361,28 @@ io.on('connection', (socket) => {
     const game = roomManager.getPlayerRoom(playerId);
 
     if (game) {
-      const roomId = game.roomId;
-      roomManager.leaveRoom(playerId);
-      socket.leave(roomId);
-      socket.to(roomId).emit('playerLeft', { playerId, displayName });
+      // Check if they're a kibbitzer first
+      const isKibbitzer = game.kibbitzers.find(k => k.id === playerId);
 
-      const updatedGame = roomManager.getRoom(roomId);
-      if (updatedGame) {
-        io.to(roomId).emit('roomUpdate', {
-          players: updatedGame.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
-          phase: updatedGame.phase
-        });
+      if (isKibbitzer) {
+        // Remove kibbitzer
+        game.removeKibbitzer(playerId);
+        socket.leave(game.roomId);
+        socket.to(game.roomId).emit('kibitzerLeft', { kibitzerId: playerId, displayName });
+      } else {
+        // Remove player
+        const roomId = game.roomId;
+        roomManager.leaveRoom(playerId);
+        socket.leave(roomId);
+        socket.to(roomId).emit('playerLeft', { playerId, displayName });
+
+        const updatedGame = roomManager.getRoom(roomId);
+        if (updatedGame) {
+          io.to(roomId).emit('roomUpdate', {
+            players: updatedGame.players.map(p => ({ id: p.id, name: p.name, seatIndex: p.seatIndex })),
+            phase: updatedGame.phase
+          });
+        }
       }
     }
   });
@@ -579,7 +619,9 @@ io.on('connection', (socket) => {
     }
 
     const roomId = game.roomId;
-    const result = game.markPlayerLeaving(playerId);
+
+    // Mark as leaving (stores name for display)
+    game.markPlayerLeaving(playerId);
 
     // Remove the player immediately and send them to lobby
     roomManager.leaveRoom(playerId);
@@ -596,7 +638,7 @@ io.on('connection', (socket) => {
     if (updatedGame) {
       io.to(roomId).emit('votingUpdate', {
         playersNextHand: updatedGame.getNextHandPlayerNames(),
-        playersLeaving: updatedGame.getLeavingPlayerNames(),
+        playersLeaving: updatedGame.getLeavingPlayerNames(), // Names are persisted
         allVoted: updatedGame.haveAllPlayersVoted()
       });
 
@@ -693,12 +735,24 @@ io.on('connection', (socket) => {
 
   function broadcastGameState(game) {
     const playerScores = getPlayerScores(game);
+
+    // Send state to players
     for (const player of game.players) {
       const playerSocket = findSocketByPlayerId(player.id);
       if (playerSocket) {
         const state = game.getStateForPlayer(player.id);
         state.playerScores = playerScores;
         playerSocket.emit('gameState', state);
+      }
+    }
+
+    // Send state to kibbitzers
+    for (const kibbitzer of game.kibbitzers) {
+      const kibitzerSocket = findSocketByPlayerId(kibbitzer.id);
+      if (kibitzerSocket) {
+        const state = game.getStateForKibbitzer(kibbitzer.id);
+        state.playerScores = playerScores;
+        kibitzerSocket.emit('gameState', state);
       }
     }
   }

@@ -52,17 +52,17 @@
 
       <div class="lobby-content">
         <div class="lobby-section">
-          <h2>Join or Create Room</h2>
+          <h2>Join or Create Table</h2>
           <div class="room-input">
-            <input type="text" id="room-code" placeholder="Room Code" maxlength="20">
-            <button id="join-room-btn" class="btn primary">Join Room</button>
+            <input type="text" id="room-code" placeholder="Table Code" maxlength="20">
+            <button id="join-room-btn" class="btn primary">Join Table</button>
           </div>
         </div>
 
         <div class="lobby-section">
-          <h2>Active Rooms</h2>
+          <h2>Active Tables</h2>
           <div id="room-list" class="room-list">
-            <p class="no-rooms">No active rooms</p>
+            <p class="no-rooms">No active tables</p>
           </div>
         </div>
 
@@ -95,7 +95,6 @@
     <!-- Game Screen -->
     <div id="game-screen" class="screen hidden">
       <header class="game-header">
-        <button id="leave-room-btn" class="btn small">Leave</button>
         <span id="room-name"></span>
         <span id="game-phase"></span>
       </header>
@@ -118,6 +117,7 @@
           <div id="picker-info"></div>
           <div id="called-suit-info"></div>
           <div id="trick-count"></div>
+          <button id="show-last-trick-btn" class="btn small hidden">Show Last Trick</button>
         </div>
       </div>
 
@@ -148,8 +148,17 @@
           <div id="waiting-players"></div>
           <div class="waiting-buttons">
             <button id="start-game-btn" class="btn primary hidden">Start Game</button>
-            <button id="cancel-room-btn" class="btn danger">Leave Room</button>
+            <button id="cancel-room-btn" class="btn danger">Leave Table</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Last Trick Review overlay -->
+      <div id="last-trick-overlay" class="overlay hidden">
+        <div class="last-trick-content">
+          <h2>Last Trick</h2>
+          <div id="last-trick-cards" class="last-trick-cards"></div>
+          <button id="close-last-trick-btn" class="btn primary">Close</button>
         </div>
       </div>
     </div>

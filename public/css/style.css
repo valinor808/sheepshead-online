@@ -258,6 +258,21 @@ body {
   color: #aaa;
 }
 
+.room-item .room-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.kibitz-btn {
+  background: var(--table-color) !important;
+  color: var(--text-color) !important;
+  border: 1px solid var(--accent);
+}
+
+.kibitz-btn:hover {
+  background: var(--bg-color) !important;
+}
+
 .no-rooms {
   color: #aaa;
   font-style: italic;
@@ -638,7 +653,8 @@ body {
 }
 
 .scoring-content,
-.waiting-content {
+.waiting-content,
+.last-trick-content {
   background: var(--table-color);
   padding: 30px;
   border-radius: 15px;
@@ -648,9 +664,29 @@ body {
 }
 
 .scoring-content h2,
-.waiting-content h2 {
+.waiting-content h2,
+.last-trick-content h2 {
   color: var(--accent);
   margin-bottom: 20px;
+}
+
+.last-trick-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.last-trick-cards .trick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+#show-last-trick-btn {
+  margin-top: 10px;
 }
 
 #scoring-details {
@@ -723,12 +759,18 @@ body {
 }
 
 .players-leaving {
-  background: rgba(220, 53, 69, 0.2);
-  border: 1px solid rgba(220, 53, 69, 0.5);
+  margin-bottom: 15px;
+}
+
+.player-left-notification {
+  background: rgba(220, 53, 69, 0.3);
+  border: 2px solid var(--danger);
+  color: var(--danger);
   padding: 10px;
   border-radius: 5px;
-  margin-bottom: 15px;
+  margin-bottom: 8px;
   font-size: 14px;
+  font-weight: bold;
 }
 
 .players-waiting {
