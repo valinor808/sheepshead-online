@@ -7,10 +7,11 @@
  * 1. WAITING - Waiting for 5 players to join
  * 2. DEALING - Cards dealt (6 per player, 2 to blind)
  * 3. PICKING - Players decide to pick or pass (clockwise from dealer's left)
- * 4. BURYING - Picker buries 2 cards (or SCHWANZER if everyone passed)
- * 5. CALLING - Picker calls a partner (ace or goes alone)
+ * 4. CALLING - Picker calls a partner (ace or goes alone) with full 8-card hand
+ * 5. BURYING - Picker buries 2 cards (must keep 1 of called suit)
  * 6. PLAYING - 6 tricks are played
  * 7. SCORING - Points tallied, scores assigned
+ * Note: If everyone passes, goes directly to SCHWANZER (leasters)
  *
  * Key Rules:
  * - Trump: All Queens, all Jacks, all Diamonds (in that order of power)
@@ -283,7 +284,8 @@ class SheepsheadGame {
       this.hands[playerId] = [...this.hands[playerId], ...this.blind];
       this.hands[playerId] = sortHand(this.hands[playerId]);
       this.blind = [];
-      this.phase = PHASES.BURYING;
+      // Go to calling phase first (picker calls with full 8-card hand)
+      this.phase = PHASES.CALLING;
       return { success: true, picked: true };
     } else {
       // Player passes
@@ -310,10 +312,10 @@ class SheepsheadGame {
   /**
    * Handle the picker burying cards
    *
-   * Bury validation rules:
+   * Bury validation rules (simplified - calling happens first):
    * 1. Cannot bury Queens or Jacks if you have other options
-   * 2. Must keep at least 1 non-ace fail card if possible
-   * 3. If (2) isn't possible, must keep at least 1 fail ace if possible
+   * 2. Must keep at least 1 card of the called suit (hold card)
+   * 3. Cannot bury the under card if this is an under call
    */
   bury(playerId, cardIds) {
     if (this.phase !== PHASES.BURYING) {
@@ -337,6 +339,11 @@ class SheepsheadGame {
       toBury.push(hand[cardIndex]);
     }
 
+    // Rule: Can't bury the under card if this is an under call
+    if (this.underCardId && cardIds.includes(this.underCardId)) {
+      return { success: false, error: 'Cannot bury your under card' };
+    }
+
     // Rule: Can't bury queens or jacks unless no choice
     const nonPointTrump = toBury.filter(c => (c.rank === 'Q' || c.rank === 'J'));
     if (nonPointTrump.length > 0) {
@@ -351,48 +358,13 @@ class SheepsheadGame {
     // Calculate what remains after burying
     const remainingHand = hand.filter(c => !cardIds.includes(c.id));
 
-    // Rule: For each fail suit where you don't have the ace, you must keep at least one non-ace fail card
-    // This ensures you have a "hold card" for suits you might call
-    for (const suit of FAIL_SUITS) {
-      // Check if we have the ace of this suit in remaining hand
-      const hasAce = remainingHand.some(c => c.suit === suit && c.rank === 'A' && !isTrump(c));
-
-      if (!hasAce) {
-        // We don't have the ace - check if we have non-ace fail cards in this suit
-        const allNonAceInSuit = hand.filter(c => c.suit === suit && c.rank !== 'A' && !isTrump(c));
-        const remainingNonAceInSuit = remainingHand.filter(c => c.suit === suit && c.rank !== 'A' && !isTrump(c));
-
-        // If we had any non-ace cards in this suit, we must keep at least one
-        if (allNonAceInSuit.length > 0 && remainingNonAceInSuit.length === 0) {
-          return { success: false, error: `Must keep at least one ${suit} card (hold card for calling that suit)` };
-        }
-      }
-    }
-
-    // Get fail cards in remaining hand (non-trump cards)
-    const remainingFailCards = remainingHand.filter(c => !isTrump(c));
-    const remainingFailAces = remainingFailCards.filter(c => c.rank === 'A');
-    const remainingNonAceFail = remainingFailCards.filter(c => c.rank !== 'A');
-
-    // Get fail cards in the full hand (before bury)
-    const allFailCards = hand.filter(c => !isTrump(c));
-    const allFailAces = allFailCards.filter(c => c.rank === 'A');
-    const allNonAceFail = allFailCards.filter(c => c.rank !== 'A');
-
-    // Rule: Must keep at least 1 non-ace fail card if possible (general rule)
-    if (remainingNonAceFail.length === 0 && allNonAceFail.length > 0) {
-      // If we're burying ALL non-ace fail cards, that's only OK if we had <= 2
-      if (allNonAceFail.length > BLIND_SIZE) {
-        return { success: false, error: 'Must keep at least one non-ace fail card if possible' };
-      }
-    }
-
-    // Rule: If no non-ace fail can be kept, must keep at least 1 fail ace if possible
-    if (remainingNonAceFail.length === 0 && remainingFailAces.length === 0 && allFailAces.length > 0) {
-      // No non-ace fail remains, and no fail aces remain, but we had fail aces
-      // This is only OK if we couldn't keep any fail aces (had <= 2 total fail aces)
-      if (allFailAces.length > BLIND_SIZE) {
-        return { success: false, error: 'Must keep at least one fail ace if no other fail cards' };
+    // Rule: Must keep at least 1 card of the called suit (hold card requirement)
+    if (this.calledSuit) {
+      const remainingInCalledSuit = remainingHand.filter(c =>
+        c.suit === this.calledSuit && !isTrump(c)
+      );
+      if (remainingInCalledSuit.length === 0) {
+        return { success: false, error: `Must keep at least one ${this.calledSuit} card (hold card for called suit)` };
       }
     }
 
@@ -400,8 +372,9 @@ class SheepsheadGame {
     this.hands[playerId] = remainingHand;
     this.buried = toBury;
 
-    // Move to calling phase
-    this.phase = PHASES.CALLING;
+    // Move to playing phase
+    this.phase = PHASES.PLAYING;
+    this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
     return { success: true };
   }
 
@@ -511,8 +484,8 @@ class SheepsheadGame {
       this.partner = null;
       this.isUnderCall = false;
       this.underCardId = null;
-      this.phase = PHASES.PLAYING;
-      this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
+      // Go to burying phase next
+      this.phase = PHASES.BURYING;
       return { success: true, goAlone: true };
     }
 
@@ -554,9 +527,8 @@ class SheepsheadGame {
     // For under call, partner is revealed when under card is played
     this.partner = null;
 
-    // Move to playing phase
-    this.phase = PHASES.PLAYING;
-    this.currentPlayerIndex = (this.dealerIndex + 1) % NUM_PLAYERS;
+    // Move to burying phase next
+    this.phase = PHASES.BURYING;
 
     return {
       success: true,
