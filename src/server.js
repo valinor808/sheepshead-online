@@ -766,8 +766,11 @@ io.on('connection', (socket) => {
       const handResult = {
         wasPicker: player.id === results.picker,
         wonAsPicker: player.id === results.picker && results.pickersWin,
+        wasCalledAsPartner: player.id === results.partner,
         wonAsPartner: player.id === results.partner && results.pickersWin,
         wonAsDefender: results.defendingTeam && results.defendingTeam.includes(player.id) && !results.pickersWin,
+        wentAlone: player.id === results.picker && !results.partner,
+        wonAsAlone: player.id === results.picker && !results.partner && results.pickersWin,
         isSchwanzer: results.type === 'schwanzer',
         wonSchwanzer: results.type === 'schwanzer' && player.id === results.winner,
         scoreChange,

@@ -60,8 +60,11 @@ async function initDb() {
       hands_played INTEGER DEFAULT 0,
       hands_picked INTEGER DEFAULT 0,
       hands_won_as_picker INTEGER DEFAULT 0,
+      hands_called_as_partner INTEGER DEFAULT 0,
       hands_won_as_partner INTEGER DEFAULT 0,
       hands_won_as_defender INTEGER DEFAULT 0,
+      hands_alone INTEGER DEFAULT 0,
+      hands_won_as_alone INTEGER DEFAULT 0,
       schwanzers_played INTEGER DEFAULT 0,
       schwanzers_won INTEGER DEFAULT 0,
       total_score INTEGER DEFAULT 0,
@@ -80,8 +83,11 @@ async function initDb() {
       hands_played INTEGER DEFAULT 0,
       hands_picked INTEGER DEFAULT 0,
       hands_won_as_picker INTEGER DEFAULT 0,
+      hands_called_as_partner INTEGER DEFAULT 0,
       hands_won_as_partner INTEGER DEFAULT 0,
       hands_won_as_defender INTEGER DEFAULT 0,
+      hands_alone INTEGER DEFAULT 0,
+      hands_won_as_alone INTEGER DEFAULT 0,
       schwanzers_played INTEGER DEFAULT 0,
       schwanzers_won INTEGER DEFAULT 0,
       score INTEGER DEFAULT 0,
@@ -135,6 +141,38 @@ async function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+
+  // Add new columns to existing databases (migration)
+  try {
+    db.run('ALTER TABLE player_stats ADD COLUMN hands_called_as_partner INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.run('ALTER TABLE player_stats ADD COLUMN hands_alone INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.run('ALTER TABLE player_stats ADD COLUMN hands_won_as_alone INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.run('ALTER TABLE daily_stats ADD COLUMN hands_called_as_partner INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.run('ALTER TABLE daily_stats ADD COLUMN hands_alone INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    db.run('ALTER TABLE daily_stats ADD COLUMN hands_won_as_alone INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   // Save initially
   saveDb();
