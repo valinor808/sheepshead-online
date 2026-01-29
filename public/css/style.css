@@ -333,8 +333,8 @@ body {
 
 .game-table {
   position: relative;
-  height: calc(100vh - 200px);
-  min-height: 400px;
+  height: calc(100vh - 240px);
+  min-height: 350px;
   background: var(--table-color);
   border-radius: 50%;
   margin: 20px auto;
@@ -572,8 +572,8 @@ body {
 
 /* Card styling */
 .card {
-  width: 70px;
-  height: 100px;
+  width: 88px;
+  height: 125px;
   background: var(--card-bg);
   border-radius: 8px;
   display: flex;
@@ -629,8 +629,8 @@ body {
 }
 
 .card.small {
-  width: 50px;
-  height: 72px;
+  width: 88px;
+  height: 125px;
 }
 
 .card.small .card-image {
@@ -822,14 +822,14 @@ body {
 /* Responsive */
 @media (max-width: 768px) {
   .game-table {
-    height: calc(100vh - 250px);
+    height: calc(100vh - 280px);
     margin: 10px;
     border-radius: 20px;
   }
 
   .card {
-    width: 55px;
-    height: 80px;
+    width: 69px;
+    height: 100px;
   }
 
   .card .card-rank {
