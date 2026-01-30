@@ -91,3 +91,48 @@ Server runs on http://localhost:3000
 - [src/models/database.js](src/models/database.js) - Database schema and migration logic
 - [src/models/User.js](src/models/User.js) - Stats retrieval and update methods (`getStats()`, `updateStats()`, `getDailyStats()`)
 - [src/server.js](src/server.js) - Constructs `handResult` objects with all tracking flags in `updatePlayerStats()`
+
+## Testing
+
+### Test Documentation Approach
+Test cases are documented in markdown files before being converted to Jest tests. This provides:
+- Living documentation of game rules
+- Easy review and editing of test cases
+- Source of truth for expected behavior
+
+### Test Documentation Files
+- [docs/testing/README.md](docs/testing/README.md) - Testing workflow and file format
+- [docs/testing/test-checklist.md](docs/testing/test-checklist.md) - Master checklist tracking all test coverage
+### Collaborators
+- **schmo33** — smoriearty's GitHub username
+- **valinor808** — friend/collaborator's GitHub username
+
+### Session Notes
+**At the start of a new session**: Ask the user if they'd like you to read the latest session notes to get context on recent work.
+
+**At the end of each session**: Create a summary file in `docs/sessions/` with the format `SESSION-YYYY-MM-DD-username.md` (use GitHub username). Include:
+- What was accomplished
+- Open issues or questions
+- Recommended next steps
+- Files changed
+
+This helps the next person (and Claude) pick up where you left off.
+
+**Recent sessions:**
+- [docs/sessions/SESSION-2025-01-29-schmo33.md](docs/sessions/SESSION-2025-01-29-schmo33.md) - Testing setup, open issues (Under/Call 10 logic)
+- [docs/testing/test-cases-cards.md](docs/testing/test-cases-cards.md) - Card fundamentals (trump, power, comparisons)
+- [docs/testing/test-cases-tricks.md](docs/testing/test-cases-tricks.md) - Trick-taking rules
+- `docs/testing/test-cases-calling.md` - Partner calling scenarios (to be created)
+- `docs/testing/test-cases-scoring.md` - Scoring calculations (to be created)
+
+### Running Tests
+```bash
+npm test              # Run all tests
+npm test -- --watch   # Watch mode
+```
+
+### Workflow
+1. Document test cases in `docs/testing/*.md`
+2. Review and update as game rules evolve
+3. Generate Jest tests from documentation
+4. Run `npm test` to verify implementation
