@@ -361,7 +361,7 @@ describe('Under Card Must Be Played When Called Suit Led', () => {
     expect(game.underCardPlayed).toBe(true); // Under card was played
   });
 
-  test('Under card not required when different suit is led', () => {
+  test('Under card not required when different suit is led (picker has led suit)', () => {
     const game = new SheepsheadGame('test-room');
 
     for (let i = 0; i < 5; i++) {
@@ -405,6 +405,49 @@ describe('Under Card Must Be Played When Called Suit Led', () => {
     const result = game.playCard('player0', 'A_hearts');
     expect(result.success).toBe(true);
     expect(game.underCardPlayed).toBe(false); // Under card wasn't played
+  });
+
+  test('Under card cannot be played when different suit is led (picker must save it)', () => {
+    const game = new SheepsheadGame('test-room');
+
+    for (let i = 0; i < 5; i++) {
+      game.addPlayer(`player${i}`, `Player ${i}`);
+    }
+
+    game.phase = 'playing';
+    game.picker = 'player1'; // Make player1 the picker this time
+    game.calledSuit = 'clubs';
+    game.calledRank = 'A';
+    game.isUnderCall = true;
+    game.underCardId = '7_diamonds';
+    game.underCardPlayed = false;
+    game.partner = null;
+    game.dealerIndex = 4;
+    game.currentPlayerIndex = 0; // player0 leads
+
+    // Picker (player1) has NO hearts - must save under card for when clubs are led
+    game.hands['player0'] = [card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts')];
+    game.hands['player1'] = [card('A', 'spades'), card('K', 'spades'), card('7', 'diamonds'), card('Q', 'clubs')];
+    game.hands['player2'] = [card('A', 'clubs'), card('7', 'clubs'), card('8', 'clubs')];
+    game.hands['player3'] = [card('K', 'clubs'), card('10', 'clubs'), card('9', 'clubs')];
+    game.hands['player4'] = [card('7', 'spades'), card('8', 'spades'), card('K', 'hearts')];
+
+    for (let i = 0; i < 5; i++) {
+      game.tricksWon[`player${i}`] = [];
+    }
+
+    // player0 leads hearts (NOT the called suit)
+    game.playCard('player0', '10_hearts');
+
+    // player1 (picker) tries to play under card - should FAIL (must save it for called suit)
+    const badResult = game.playCard('player1', '7_diamonds');
+    expect(badResult.success).toBe(false);
+    expect(badResult.error).toContain('nder card'); // Matches "Under card" or "under card"
+
+    // player1 can play any other card (A♠, K♠, or Q♣)
+    const goodResult = game.playCard('player1', 'A_spades');
+    expect(goodResult.success).toBe(true);
+    expect(game.underCardPlayed).toBe(false); // Under card still not played
   });
 });
 

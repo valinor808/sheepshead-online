@@ -566,6 +566,18 @@ class SheepsheadGame {
       return { success: false, error: 'You must play your under card when the called suit is led' };
     }
 
+    // If picker is trying to play under card when called suit is NOT led, reject
+    // (Under card can only be played when called suit is led)
+    if (this.isUnderCall &&
+        this.underCardId &&
+        !this.underCardPlayed &&
+        playerId === this.picker &&
+        cardId === this.underCardId &&
+        !isLeading &&
+        leadSuit !== this.calledSuit) {
+      return { success: false, error: 'Under card can only be played when the called suit is led' };
+    }
+
     // Validate the selected card is in hand
     const cardIndex = hand.findIndex(c => c.id === cardId);
     if (cardIndex === -1) {
