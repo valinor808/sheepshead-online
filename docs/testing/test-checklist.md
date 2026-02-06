@@ -80,13 +80,15 @@ Tests: [tests/scoring.test.js](../../tests/scoring.test.js)
 - [x] Buried points count for picker's team
 
 ### Schwanzer
-Documentation: [test-cases-scoring.md](test-cases-scoring.md)
+Documentation: [test-cases-schwanzer.md](test-cases-schwanzer.md)
+Tests: [tests/schwanzer.test.js](../../tests/schwanzer.test.js)
 
-- [ ] Triggered when all 5 players pass
-- [ ] Schwanzer points: Queens=3, Jacks=2, Diamonds=1
-- [ ] Player(s) with most Schwanzer points loses
-- [ ] Scoring: 1 loser=-4, 2 losers=-3 each, 3=-2, 4=-1, 5=draw
-- [ ] Winners split positive points evenly
+- [x] Schwanzer point calculation (Q=3, J=2, diamonds=1)
+- [x] Triggered when all 5 players pass
+- [x] Player(s) with most Schwanzer points loses
+- [x] Scoring: 1 loser=-4, 2 losers=-3 each, 3=-2, 4=-1, 5=draw
+- [x] Zero-sum verification
+- [x] Result structure
 
 ---
 
@@ -150,7 +152,7 @@ These test the complete system with multiple simulated clients.
 | Partner Calling | [x] | [x] |
 | Burying | [x] | [x] |
 | Scoring | [x] | [x] |
-| Schwanzer | [ ] | [ ] |
+| Schwanzer | [x] | [x] |
 | Session/Auth | [ ] | [ ] |
 | Database/Stats | [ ] | [ ] |
 | Multiplayer | [ ] | [ ] |
