@@ -49,10 +49,10 @@ Tests: [tests/calling.test.js](../../tests/calling.test.js)
 - [x] Normal call (call ace you don't have)
 - [x] Under call (have ace of every fail suit you hold)
 - [x] Call 10 (have all 3 fail aces)
-- [ ] Go alone - voluntary
+- [x] Go alone - voluntary
 - [x] Go alone - forced (have all aces and 10s)
-- [ ] Partner revealed when called card played
-- [ ] Under card must be played when called suit led
+- [x] Partner revealed when called card played
+- [x] Under card must be played when called suit led
 - [x] Under card cannot win trick
 - [x] Picker must keep one card of called suit until led
 
@@ -143,7 +143,7 @@ These test the complete system with multiple simulated clients.
 |----------|------------|-------------|
 | Card Fundamentals | [x] | [x] |
 | Trick-Taking | [x] | [x] |
-| Partner Calling | [x] | Partial |
+| Partner Calling | [x] | [x] |
 | Burying | [ ] | [ ] |
 | Scoring | [ ] | [ ] |
 | Schwanzer | [ ] | [ ] |
