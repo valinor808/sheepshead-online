@@ -68,14 +68,16 @@ Tests: [tests/burying.test.js](../../tests/burying.test.js)
 
 ### Scoring
 Documentation: [test-cases-scoring.md](test-cases-scoring.md)
+Tests: [tests/scoring.test.js](../../tests/scoring.test.js)
 
-- [ ] Win threshold: Picker needs 61, Defenders need 60
-- [ ] Schneider: Picker needs 91, Defenders need 90 (2x)
-- [ ] Schwarz: Losing team takes no tricks (3x)
-- [ ] Picker multiplier: 2x (or 4x if alone)
-- [ ] Partner multiplier: 1x
-- [ ] Defender multiplier: 1x each
-- [ ] Total points always sum to zero
+- [x] Win threshold: Picker needs 61, Defenders need 60
+- [x] Schneider: Picker needs 91, Defenders need 90 (2x)
+- [x] Schwarz: Losing team takes no tricks (3x)
+- [x] Picker multiplier: 2x (or 4x if alone)
+- [x] Partner multiplier: 1x
+- [x] Defender multiplier: 1x each
+- [x] Total points always sum to zero
+- [x] Buried points count for picker's team
 
 ### Schwanzer
 Documentation: [test-cases-scoring.md](test-cases-scoring.md)
@@ -147,7 +149,7 @@ These test the complete system with multiple simulated clients.
 | Trick-Taking | [x] | [x] |
 | Partner Calling | [x] | [x] |
 | Burying | [x] | [x] |
-| Scoring | [ ] | [ ] |
+| Scoring | [x] | [x] |
 | Schwanzer | [ ] | [ ] |
 | Session/Auth | [ ] | [ ] |
 | Database/Stats | [ ] | [ ] |

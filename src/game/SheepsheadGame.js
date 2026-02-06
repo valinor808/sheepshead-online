@@ -759,7 +759,8 @@ class SheepsheadGame {
       defendingTeam.flatMap(id => this.tricksWon[id]) :
       pickingTeam.flatMap(id => this.tricksWon[id]);
 
-    if (losingPoints < WIN_THRESHOLD - 30) { // Less than 31
+    const schneiderThreshold = pickersWin ? 30 : 31; // Picker needs 91+, defenders need 90+
+    if (losingPoints < schneiderThreshold) {
       schneider = true;
       multiplier = 2;
     }
