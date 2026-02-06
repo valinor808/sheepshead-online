@@ -28,14 +28,19 @@ Tests: [tests/deck.test.js](../../tests/deck.test.js)
 
 ### Trick-Taking
 Documentation: [test-cases-tricks.md](test-cases-tricks.md)
+Tests: [tests/tricks.test.js](../../tests/tricks.test.js)
 
-- [D] Determining trick winner
-- [D] Following suit rules
-- [D] Playable cards calculation
-- [D] Lead card determines suit
-- [D] Trump beats fail
-- [D] Under card cannot win tricks
-- [D] First card wins when neither follows suit
+- [x] Determining trick winner
+- [x] Following suit rules
+- [x] Playable cards calculation
+- [x] Lead card determines suit
+- [x] Trump beats fail
+- [x] Under card cannot win tricks
+- [x] First card wins when neither follows suit
+- [x] Partner leading restrictions (must lead ace unless running)
+- [x] Partner must play ace when called suit led
+- [x] Picker hold card rule (keep one card of called suit)
+- [x] Picker can lead called suit
 
 ### Partner Calling
 Documentation: [test-cases-tricks.md](test-cases-tricks.md) (Under Call Rules, Call 10 Rules sections)
@@ -49,7 +54,7 @@ Tests: [tests/calling.test.js](../../tests/calling.test.js)
 - [ ] Partner revealed when called card played
 - [ ] Under card must be played when called suit led
 - [x] Under card cannot win trick
-- [ ] Picker must keep one card of called suit until led
+- [x] Picker must keep one card of called suit until led
 
 ### Burying
 Documentation: [test-cases-calling.md](test-cases-calling.md) (or separate file)
@@ -137,7 +142,7 @@ These test the complete system with multiple simulated clients.
 | Category | Documented | Implemented |
 |----------|------------|-------------|
 | Card Fundamentals | [x] | [x] |
-| Trick-Taking | [D] | [ ] |
+| Trick-Taking | [x] | [x] |
 | Partner Calling | [x] | Partial |
 | Burying | [ ] | [ ] |
 | Scoring | [ ] | [ ] |

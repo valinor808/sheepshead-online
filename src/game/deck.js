@@ -206,19 +206,9 @@ function getPlayableCards(hand, currentTrick, calledSuit = null, calledSuitHasBe
         });
       }
 
-      // PICKER RULE: Picker must keep at least one card of the called suit
-      // until the called suit is led. They can play other cards from that suit,
-      // but must retain at least one.
-      if (isPicker && !calledSuitHasBeenLed && cardsInCalledSuit.length > 0) {
-        // If picker only has 1 card in called suit, they can't play it yet
-        if (cardsInCalledSuit.length === 1) {
-          return hand.filter(c => getEffectiveSuit(c) !== calledSuit);
-        }
-        // If picker has multiple cards in called suit, they can play all but must keep one
-        // When leading, just prevent leading the called suit entirely if they'd be left with 0
-        // Actually for leading, they CAN lead the called suit as long as they keep one
-        // But simpler: they can lead anything, just enforce on non-leading plays
-      }
+      // PICKER RULE: Picker CAN lead the called suit (to draw out partner's ace).
+      // The hold card restriction only applies when discarding (not following suit),
+      // not when leading. See the non-leading section below for that restriction.
     }
     return hand;
   }
