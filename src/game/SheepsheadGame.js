@@ -429,14 +429,15 @@ class SheepsheadGame {
       // Can call a 10 of any fail suit they DON'T have the 10 of
       for (const suit of FAIL_SUITS) {
         if (!tensHeld.includes(suit)) {
-          options.push({ suit, rank: '10', type: 'under' });
+          options.push({ suit, rank: '10', type: 'normal' });
         }
       }
       // If they have all 3 fail 10s too, must go alone
       if (options.length === 0) {
         return { goAlone: true, options: [], reason: 'Have all 3 fail aces and all fail 10s' };
       }
-      return { goAlone: false, options, mustSelectUnderCard: true };
+      // No under card needed - picker can follow suit with their ace
+      return { goAlone: false, options, mustSelectUnderCard: false };
     }
 
     // Case 2: Picker has at least one fail suit WITHOUT the ace - normal call
@@ -627,12 +628,6 @@ class SheepsheadGame {
       partnerRevealed = true;
     }
 
-    // For under calls, when picker plays the under card, they become their own partner
-    // The under card is treated as if it's the called card for partnership purposes
-    if (isUnderCard && !this.partner) {
-      this.partner = playerId;
-      partnerRevealed = true;
-    }
 
     // Track if called suit has been led
     if (this.calledSuit && isLeading && getEffectiveSuit(card) === this.calledSuit) {

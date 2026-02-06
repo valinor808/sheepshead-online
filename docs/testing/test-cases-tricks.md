@@ -122,30 +122,98 @@ The picker can always lead the called suit — doing so draws out the partner's 
 | K♠, 10♠, Q♣ | Spades | No | All | Can lead either spade |
 | K♠, K♥, Q♣ | Spades | Yes | All | Suit already led, no restriction |
 
-## Under Card Rules
+## Under Call Rules
 
-In an under call, the picker designates one of their cards as the "under card." This card:
-- Must be played when the called suit is led
-- Cannot win the trick (filtered out when determining winner)
-- Reveals the picker as their own partner when played
+### When is Under Required?
+
+Under is required when **all of the picker's fail suits include the ace of that suit** (after picking up the blind). The picker cannot call a suit where they hold the ace, so they must call a suit they have no cards in.
+
+| Picker's Fail Cards | Can Call Normally?     | Must Call Under?      | Reason                         |
+| ------------------- | ---------------------- | --------------------- | ------------------------------ |
+| K♥, 10♥, 9♠         | Yes (hearts or spades) | No                    | Has hearts without ace         |
+| A♥, K♥, 9♠          | Yes (spades)           | No                    | Has spades without ace         |
+| A♥, A♠ (no clubs)   | No                     | Yes (clubs)           | All fail suits have their aces |
+| A♥ only             | No                     | Yes (spades or clubs) | Only fail suit has its ace     |
+
+### How Under Works
+
+1. Picker calls an ace of a suit they have **no cards in** (e.g., clubs)
+2. Picker designates one of their cards as the "under card"
+3. When the called suit is led, picker **must play the under card**
+4. The under card **cannot win** the trick (excluded from winner determination)
+5. Partner is whoever holds the called ace — revealed when they play it
 
 ### Under Card Must Be Played
 
 | Scenario | Lead Suit | Called Suit | Under Card | Must Play | Notes |
 |----------|-----------|-------------|------------|-----------|-------|
-| Called suit led | Hearts | Hearts | 7♦ | 7♦ | Must play under card |
-| Different suit led | Spades | Hearts | 7♦ | No | Normal play |
-| Under card already played | Hearts | Hearts | (already played) | No | Normal following suit |
+| Called suit led | Clubs | Clubs | 7♦ | 7♦ | Must play under card |
+| Different suit led | Spades | Clubs | 7♦ | No | Normal play rules |
+| Under card already played | Clubs | Clubs | (played earlier) | No | Normal following suit |
 
 ### Under Card Cannot Win
 
-| Trick (with under card) | Under Card | Eligible Cards | Winner | Notes |
-|------------------------|------------|----------------|--------|-------|
-| A♥, K♥, 7♦*, 10♥, 9♥ | 7♦ | A♥, K♥, 10♥, 9♥ | A♥ | 7♦ excluded despite being trump |
-| 7♥, 8♥, Q♣*, 9♥, K♥ | Q♣ | 7♥, 8♥, 9♥, K♥ | K♥ | Q♣ excluded despite being highest |
-| 7♦, 8♦*, 9♦, K♦, A♦ | 8♦ | 7♦, 9♦, K♦, A♦ | A♦ | Under card excluded from comparison |
+When the called suit is led, both the under card and the called ace will be in the trick.
+
+| Called Suit | Trick | Under Card | Eligible Cards | Winner | Notes |
+|-------------|-------|------------|----------------|--------|-------|
+| Clubs | K♣, 7♦*, A♣, 10♣, 9♣ | 7♦ | K♣, A♣, 10♣, 9♣ | A♣ | 7♦ excluded despite being trump |
+| Hearts | 10♥, Q♠*, A♥, K♥, 9♥ | Q♠ | 10♥, A♥, K♥, 9♥ | A♥ | Q♠ excluded despite being highest trump |
+| Spades | 10♠, Q♣*, A♠, K♠, J♦ | Q♣ | 10♠, A♠, K♠, J♦ | J♦ | Q♣ (highest trump!) excluded; J♦ wins |
 
 *Card marked with * is the under card
+
+### Under Call Example
+
+**Picker's hand after picking:** Q♣, J♥, J♦, A♥, A♠, 7♦, 8♦, 9♦
+
+- Fail suits: hearts (A♥), spades (A♠) — both include aces
+- No clubs in hand
+- **Must call under:** Calls A♣, designates 7♦ as under card
+- **Partner:** Whoever has A♣
+- When clubs is led, picker plays 7♦ (cannot win)
+- Partner revealed when they play A♣
+
+---
+
+## Call 10 Rules
+
+### When is Call 10 Required?
+
+Call 10 is required when the picker has **all three fail aces** (A♥, A♠, A♣). Since they can't call any ace, they must call a 10 instead.
+
+| Picker's Fail Aces | Call Type | Notes |
+|--------------------|-----------|-------|
+| 0, 1, or 2 aces | Normal or Under | Call an ace |
+| All 3 aces | Call 10 | Must call a 10 they don't have |
+| All 3 aces + all 3 tens | Go Alone | No valid card to call |
+
+### How Call 10 Works
+
+1. Picker calls a 10 of a suit they **don't have the 10 of**
+2. **No under card needed** — picker can follow suit normally with their ace
+3. Partner is whoever holds the called 10 — revealed when they play it
+
+### Call 10 Example
+
+**Picker's hand after picking:** Q♣, J♥, A♥, A♠, A♣, 7♦, 8♦, 9♦
+
+- Has all 3 fail aces
+- Has no fail 10s
+- **Calls:** 10♥ (or 10♠ or 10♣)
+- **Partner:** Whoever has 10♥
+- When hearts is led, picker follows with A♥ (normal play)
+- Partner revealed when they play 10♥
+
+### Call 10 vs Under Comparison
+
+| Aspect | Under | Call 10 |
+|--------|-------|---------|
+| Condition | All fail suits have their aces | Have all 3 fail aces |
+| Called card | Ace (of suit with no cards) | 10 (of suit without the 10) |
+| Under card needed? | Yes | No |
+| Following called suit | Play under card | Play ace normally |
+| Partner | Has called ace | Has called 10 |
 
 ## Points Calculation
 
