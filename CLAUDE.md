@@ -119,11 +119,9 @@ Test cases are documented in markdown files before being converted to Jest tests
 This helps the next person (and Claude) pick up where you left off.
 
 **Recent sessions:**
+- [docs/sessions/SESSION-2025-02-05-schmo33-2.md](docs/sessions/SESSION-2025-02-05-schmo33-2.md) - Burying & scoring tests, fixed Q/J burial and Schneider bugs (179 total)
 - [docs/sessions/SESSION-2025-02-05-schmo33.md](docs/sessions/SESSION-2025-02-05-schmo33.md) - Fixed Under/Call 10 bugs, added calling tests (90 total)
 - [docs/sessions/SESSION-2025-01-29-schmo33.md](docs/sessions/SESSION-2025-01-29-schmo33.md) - Testing setup, identified Under/Call 10 issues
-- [docs/testing/test-cases-cards.md](docs/testing/test-cases-cards.md) - Card fundamentals (trump, power, comparisons)
-- [docs/testing/test-cases-tricks.md](docs/testing/test-cases-tricks.md) - Trick-taking rules, Under/Call 10 documentation
-- `docs/testing/test-cases-scoring.md` - Scoring calculations (to be created)
 
 ### Running Tests
 ```bash
