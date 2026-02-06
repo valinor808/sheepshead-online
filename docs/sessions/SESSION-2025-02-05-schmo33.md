@@ -1,6 +1,23 @@
 # Session Summary — February 5, 2025
 
-## What We Did
+## What We Did (Part 2 - Continued Session)
+
+### 5. Added Trick-Taking Tests
+- Created `tests/tricks.test.js` with 38 tests
+- Covers: determining winner, following suit, partner rules, picker rules
+- Fixed bug: picker can now lead called suit (hold card rule only applies when discarding)
+
+### 6. Completed Partner Calling Tests
+- Added 5 more tests to `tests/calling.test.js`
+- Voluntary go alone
+- Partner revealed when called card played (ace and 10)
+- Under card must be played when called suit led
+
+**Total tests: 133 passing**
+
+---
+
+## What We Did (Part 1)
 
 ### 1. Reviewed and Fixed Under/Call 10 Logic
 
@@ -50,10 +67,13 @@ Created `tests/calling.test.js` with 12 new tests:
 
 **Modified:**
 - `src/game/SheepsheadGame.js` — Removed buggy under card partner logic, fixed Call 10 options
+- `src/game/deck.js` — Fixed picker leading bug (can now lead called suit)
 - `docs/testing/test-cases-tricks.md` — Comprehensive Under and Call 10 documentation
+- `docs/testing/test-checklist.md` — Updated coverage status
 
 **Created:**
-- `tests/calling.test.js` — 12 new tests for calling scenarios
+- `tests/calling.test.js` — 17 tests for calling scenarios
+- `tests/tricks.test.js` — 38 tests for trick-taking rules
 - `docs/sessions/SESSION-2025-02-05-schmo33.md` — This file
 
 ---
@@ -63,8 +83,8 @@ Created `tests/calling.test.js` with 12 new tests:
 | Category | Documented | Implemented |
 |----------|------------|-------------|
 | Card Fundamentals | ✅ | ✅ |
-| Trick-Taking | ✅ | Partial |
-| Partner Calling (Under/Call 10) | ✅ | ✅ |
+| Trick-Taking | ✅ | ✅ |
+| Partner Calling | ✅ | ✅ |
 | Burying | ❌ | ❌ |
 | Scoring | ❌ | ❌ |
 | Schwanzer | ❌ | ❌ |
@@ -73,17 +93,17 @@ Created `tests/calling.test.js` with 12 new tests:
 
 ## Recommended Next Steps
 
-1. **Implement trick-taking tests** — Convert documented cases from `test-cases-tricks.md` to Jest
-2. **Draft `test-cases-scoring.md`** — Points, schneider, schwarz calculations
-3. **Draft `test-cases-burying.md`** — Bury validation rules
-4. **Test partner reveal timing** — Verify partner is correctly identified when called card is played
+1. **Draft `test-cases-scoring.md`** — Points, schneider, schwarz calculations
+2. **Draft `test-cases-burying.md`** — Bury validation rules
+3. **Implement Scoring tests** — Important for game correctness
+4. **Implement Schwanzer tests** — Edge case when all pass
 
 ---
 
 ## Quick Commands
 
 ```bash
-npm test              # Run all tests (90 passing)
+npm test              # Run all tests (133 passing)
 npm test -- --watch   # Watch mode
 npm run dev           # Start dev server
 ```
