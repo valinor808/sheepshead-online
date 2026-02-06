@@ -57,12 +57,14 @@ Tests: [tests/calling.test.js](../../tests/calling.test.js)
 - [x] Picker must keep one card of called suit until led
 
 ### Burying
-Documentation: [test-cases-calling.md](test-cases-calling.md) (or separate file)
+Documentation: [test-cases-burying.md](test-cases-burying.md)
+Tests: [tests/burying.test.js](../../tests/burying.test.js)
 
-- [ ] Cannot bury Queens or Jacks (if other options exist)
-- [ ] Must keep at least 1 card of called suit
-- [ ] Cannot bury the under card
-- [ ] Buried points count for picker's team
+- [x] Basic validation (phase, picker, count, card in hand)
+- [x] Can bury any card including Queens and Jacks
+- [x] Must keep at least 1 card of called suit (hold card)
+- [x] No hold card needed when going alone
+- [x] Cannot bury the under card
 
 ### Scoring
 Documentation: [test-cases-scoring.md](test-cases-scoring.md)
@@ -144,7 +146,7 @@ These test the complete system with multiple simulated clients.
 | Card Fundamentals | [x] | [x] |
 | Trick-Taking | [x] | [x] |
 | Partner Calling | [x] | [x] |
-| Burying | [ ] | [ ] |
+| Burying | [x] | [x] |
 | Scoring | [ ] | [ ] |
 | Schwanzer | [ ] | [ ] |
 | Session/Auth | [ ] | [ ] |

@@ -344,17 +344,6 @@ class SheepsheadGame {
       return { success: false, error: 'Cannot bury your under card' };
     }
 
-    // Rule: Can't bury queens or jacks unless no choice
-    const nonPointTrump = toBury.filter(c => (c.rank === 'Q' || c.rank === 'J'));
-    if (nonPointTrump.length > 0) {
-      const otherCards = hand.filter(c =>
-        !cardIds.includes(c.id) && c.rank !== 'Q' && c.rank !== 'J'
-      );
-      if (otherCards.length >= BLIND_SIZE) {
-        return { success: false, error: 'Cannot bury Queens or Jacks if you have other options' };
-      }
-    }
-
     // Calculate what remains after burying
     const remainingHand = hand.filter(c => !cardIds.includes(c.id));
 
