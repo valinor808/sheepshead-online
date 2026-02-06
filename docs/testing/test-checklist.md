@@ -38,15 +38,17 @@ Documentation: [test-cases-tricks.md](test-cases-tricks.md)
 - [D] First card wins when neither follows suit
 
 ### Partner Calling
-Documentation: [test-cases-calling.md](test-cases-calling.md)
+Documentation: [test-cases-tricks.md](test-cases-tricks.md) (Under Call Rules, Call 10 Rules sections)
+Tests: [tests/calling.test.js](../../tests/calling.test.js)
 
-- [ ] Normal call (call ace you don't have)
-- [ ] Under call (have ace of every fail suit you hold)
-- [ ] Call 10 (have all 3 fail aces)
+- [x] Normal call (call ace you don't have)
+- [x] Under call (have ace of every fail suit you hold)
+- [x] Call 10 (have all 3 fail aces)
 - [ ] Go alone - voluntary
-- [ ] Go alone - forced (have all aces and 10s)
+- [x] Go alone - forced (have all aces and 10s)
 - [ ] Partner revealed when called card played
 - [ ] Under card must be played when called suit led
+- [x] Under card cannot win trick
 - [ ] Picker must keep one card of called suit until led
 
 ### Burying
@@ -136,7 +138,7 @@ These test the complete system with multiple simulated clients.
 |----------|------------|-------------|
 | Card Fundamentals | [x] | [x] |
 | Trick-Taking | [D] | [ ] |
-| Partner Calling | [ ] | [ ] |
+| Partner Calling | [x] | Partial |
 | Burying | [ ] | [ ] |
 | Scoring | [ ] | [ ] |
 | Schwanzer | [ ] | [ ] |
