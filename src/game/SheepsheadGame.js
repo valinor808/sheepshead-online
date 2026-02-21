@@ -28,7 +28,8 @@ const {
   WIN_THRESHOLD,
   SCHNEIDER_THRESHOLD,
   SCHWARZ_THRESHOLD,
-  FAIL_SUITS
+  FAIL_SUITS,
+  TRUMP_ORDER
 } = require('./constants');
 
 const {
@@ -281,6 +282,7 @@ class SheepsheadGame {
     if (wantsToPick) {
       // Player picks up the blind
       this.picker = playerId;
+      this.blindCardIds = this.blind.map(c => c.id);
       this.hands[playerId] = [...this.hands[playerId], ...this.blind];
       this.hands[playerId] = sortHand(this.hands[playerId]);
       this.blind = [];
@@ -348,7 +350,8 @@ class SheepsheadGame {
     const remainingHand = hand.filter(c => !cardIds.includes(c.id));
 
     // Rule: Must keep at least 1 card of the called suit (hold card requirement)
-    if (this.calledSuit) {
+    // Skip for under calls - picker has no cards in called suit by definition
+    if (this.calledSuit && !this.isUnderCall) {
       const remainingInCalledSuit = remainingHand.filter(c =>
         c.suit === this.calledSuit && !isTrump(c)
       );
@@ -844,16 +847,26 @@ class SheepsheadGame {
   }
 
   /**
+   * Get the highest trump index for a hand (used for schwanzer tiebreak)
+   * Returns the highest index in TRUMP_ORDER for any card in the hand, or -1 if no trump
+   */
+  _getHighestTrumpIndex(hand) {
+    let maxIndex = -1;
+    for (const card of hand) {
+      const idx = TRUMP_ORDER.findIndex(t => t.suit === card.suit && t.rank === card.rank);
+      if (idx > maxIndex) maxIndex = idx;
+    }
+    return maxIndex;
+  }
+
+  /**
    * Score a Schwanzer hand
    * Everyone passed - hand ends immediately
-   * Loser = player(s) with most Schwanzer Points (Q=3, J=2, diamonds=1)
+   * Loser = player with most Schwanzer Points (Q=3, J=2, diamonds=1)
+   * Tiebreak: player with highest trump card is sole loser
    *
-   * Scoring:
-   * - 1 loser: -4, everyone else +1
-   * - 2 losers tied: -3 each, everyone else +2
-   * - 3 losers tied: -2 each, everyone else +3
-   * - 4 losers tied: -1 each, 1 winner gets +4
-   * - 5 losers tied: 0 each (draw)
+   * Scoring: always 1 loser at -4, 4 winners at +1
+   * Exception: 5-way tie at 0 points = draw (0 each)
    */
   _scoreSchwanzer() {
     // Calculate Schwanzer points for each player's dealt hand
@@ -865,46 +878,46 @@ class SheepsheadGame {
     // Find max Schwanzer points
     const maxSchwanzerPoints = Math.max(...Object.values(playerSchwanzerPoints));
 
-    // Find all players with max Schwanzer points (losers)
-    const losers = this.players.filter(p => playerSchwanzerPoints[p.id] === maxSchwanzerPoints);
-    const winners = this.players.filter(p => playerSchwanzerPoints[p.id] < maxSchwanzerPoints);
+    // Find all players with max Schwanzer points (potential losers)
+    let losers = this.players.filter(p => playerSchwanzerPoints[p.id] === maxSchwanzerPoints);
+
+    // Tiebreak: if multiple players tied, highest trump card breaks the tie
+    if (losers.length > 1 && losers.length < NUM_PLAYERS) {
+      let highestTrumpIdx = -1;
+      let tiebreakLoser = null;
+      for (const loser of losers) {
+        const trumpIdx = this._getHighestTrumpIndex(this.hands[loser.id]);
+        if (trumpIdx > highestTrumpIdx) {
+          highestTrumpIdx = trumpIdx;
+          tiebreakLoser = loser;
+        }
+      }
+      if (tiebreakLoser) {
+        losers = [tiebreakLoser];
+      }
+    }
+
+    const winners = this.players.filter(p => !losers.find(l => l.id === p.id));
 
     // Calculate scores based on number of losers
     const scores = {};
     const numLosers = losers.length;
 
-    // Scoring table based on number of losers (total always sums to zero)
+    // With tiebreak, it's always 1 loser or 5-way tie
     let loserScore, winnerScore;
 
-    switch (numLosers) {
-      case 1:
-        loserScore = -4;
-        winnerScore = 1;
-        break;
-      case 2:
-        loserScore = -3;
-        winnerScore = 2;
-        break;
-      case 3:
-        loserScore = -2;
-        winnerScore = 3;
-        break;
-      case 4:
-        loserScore = -1;
-        winnerScore = 4;
-        break;
-      case 5:
-        // All tied - draw
-        loserScore = 0;
-        winnerScore = 0;
-        break;
-      default:
-        loserScore = 0;
-        winnerScore = 0;
+    if (numLosers === NUM_PLAYERS) {
+      // All tied - draw
+      loserScore = 0;
+      winnerScore = 0;
+    } else {
+      // 1 loser (after tiebreak if needed)
+      loserScore = -4;
+      winnerScore = 1;
     }
 
     for (const player of this.players) {
-      if (playerSchwanzerPoints[player.id] === maxSchwanzerPoints) {
+      if (losers.find(l => l.id === player.id)) {
         scores[player.id] = loserScore;
       } else {
         scores[player.id] = winnerScore;
@@ -1016,6 +1029,9 @@ class SheepsheadGame {
 
     if (this.phase === PHASES.BURYING && playerId === this.picker) {
       state.needToBury = BLIND_SIZE;
+      if (this.blindCardIds) {
+        state.blindCardIds = this.blindCardIds;
+      }
     }
 
     if (this.phase === PHASES.CALLING && playerId === this.picker) {

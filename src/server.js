@@ -607,9 +607,19 @@ io.on('connection', (socket) => {
 
   socket.on('leaveTable', () => {
     const playerId = 'user_' + oderId;
-    const game = roomManager.getPlayerRoom(playerId);
+    let game = roomManager.getPlayerRoom(playerId);
 
+    // If not found as player, check if they're a kibitzer
     if (!game) {
+      game = roomManager.getKibitzerRoom(playerId);
+      if (game) {
+        // Remove kibitzer and send them to lobby
+        game.removeKibbitzer(playerId);
+        socket.leave(game.roomId);
+        socket.emit('returnToLobby', { message: 'You left the table' });
+        socket.to(game.roomId).emit('kibitzerLeft', { kibitzerId: playerId, displayName });
+        return;
+      }
       socket.emit('error', { message: 'Not in a room' });
       return;
     }

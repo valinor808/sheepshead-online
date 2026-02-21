@@ -168,11 +168,12 @@ describe('Schwanzer - Scoring (1 loser)', () => {
   });
 });
 
-describe('Schwanzer - Scoring (2 losers)', () => {
-  test('C2: 2 losers tied get -3 each, each winner gets +2', () => {
+describe('Schwanzer - Tiebreak (highest trump)', () => {
+  test('C2: 2 players tied on points — player with highest trump is sole loser', () => {
     const game = setupSchwanzerGame({
-      // player0 and player1 tied at 8 points each: Q(3)+Q(3)+J(2)
+      // player0: Q♠(3)+Q♥(3)+J♥(2) = 8 pts, highest trump = Q♠ (index 12)
       player0: [card('Q', 'hearts'), card('Q', 'spades'), card('J', 'hearts'), card('A', 'hearts'), card('10', 'hearts'), card('9', 'hearts')],
+      // player1: Q♣(3)+Q♦(3)+J♠(2) = 8 pts, highest trump = Q♣ (index 13) — LOSER
       player1: [card('Q', 'clubs'), card('Q', 'diamonds'), card('J', 'spades'), card('A', 'spades'), card('10', 'spades'), card('9', 'spades')],
       // player2-4: 0 points each
       player2: [card('7', 'hearts'), card('8', 'hearts'), card('K', 'hearts'), card('7', 'spades'), card('8', 'spades'), card('K', 'spades')],
@@ -180,57 +181,58 @@ describe('Schwanzer - Scoring (2 losers)', () => {
       player4: [card('9', 'hearts'), card('9', 'spades'), card('9', 'clubs'), card('K', 'hearts'), card('K', 'spades'), card('K', 'clubs')],
     });
     const result = game._scoreSchwanzer();
-    expect(result.losers).toHaveLength(2);
-    expect(result.losers).toContain('player0');
-    expect(result.losers).toContain('player1');
-    expect(result.scores.player0).toBe(-3);
-    expect(result.scores.player1).toBe(-3);
-    expect(result.scores.player2).toBe(2);
-    expect(result.scores.player3).toBe(2);
-    expect(result.scores.player4).toBe(2);
+    expect(result.losers).toHaveLength(1);
+    expect(result.losers).toContain('player1'); // Q♣ is highest trump
+    expect(result.scores.player1).toBe(-4);
+    expect(result.scores.player0).toBe(1);
+    expect(result.scores.player2).toBe(1);
+    expect(result.scores.player3).toBe(1);
+    expect(result.scores.player4).toBe(1);
   });
-});
 
-describe('Schwanzer - Scoring (3 losers)', () => {
-  test('C3: 3 losers tied get -2 each, each winner gets +3', () => {
+  test('C3: 3 players tied on points — highest trump breaks tie to 1 loser', () => {
     const game = setupSchwanzerGame({
-      // player0-2 tied at 5 points each: Q(3)+J(2)
+      // player0: Q♥(3)+J♥(2) = 5 pts, highest trump = Q♥ (index 11)
       player0: [card('Q', 'hearts'), card('J', 'hearts'), card('A', 'hearts'), card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts')],
+      // player1: Q♠(3)+J♠(2) = 5 pts, highest trump = Q♠ (index 12) — LOSER
       player1: [card('Q', 'spades'), card('J', 'spades'), card('A', 'spades'), card('10', 'spades'), card('9', 'spades'), card('8', 'spades')],
-      player2: [card('Q', 'clubs'), card('J', 'clubs'), card('A', 'clubs'), card('10', 'clubs'), card('9', 'clubs'), card('8', 'clubs')],
+      // player2: Q♦(3)+J♣(2) = 5 pts, highest trump = Q♦ (index 10)
+      player2: [card('Q', 'diamonds'), card('J', 'clubs'), card('A', 'clubs'), card('10', 'clubs'), card('9', 'clubs'), card('8', 'clubs')],
       // player3-4: 0 points each
       player3: [card('7', 'hearts'), card('7', 'spades'), card('7', 'clubs'), card('K', 'hearts'), card('K', 'spades'), card('K', 'clubs')],
       player4: [card('9', 'hearts'), card('9', 'spades'), card('9', 'clubs'), card('8', 'hearts'), card('8', 'spades'), card('8', 'clubs')],
     });
     const result = game._scoreSchwanzer();
-    expect(result.losers).toHaveLength(3);
-    expect(result.scores.player0).toBe(-2);
-    expect(result.scores.player1).toBe(-2);
-    expect(result.scores.player2).toBe(-2);
-    expect(result.scores.player3).toBe(3);
-    expect(result.scores.player4).toBe(3);
+    expect(result.losers).toHaveLength(1);
+    expect(result.losers).toContain('player1'); // Q♠ is highest trump among tied
+    expect(result.scores.player1).toBe(-4);
+    expect(result.scores.player0).toBe(1);
+    expect(result.scores.player2).toBe(1);
+    expect(result.scores.player3).toBe(1);
+    expect(result.scores.player4).toBe(1);
   });
-});
 
-describe('Schwanzer - Scoring (4 losers)', () => {
-  test('C4: 4 losers tied get -1 each, 1 winner gets +4', () => {
+  test('C4: 4 players tied on points — highest trump breaks tie to 1 loser', () => {
     const game = setupSchwanzerGame({
-      // player0-3 tied at 1 point each (one diamond card)
+      // player0: 7♦(1) = 1 pt, highest trump = 7♦ (index 0)
       player0: [card('7', 'diamonds'), card('A', 'hearts'), card('10', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],
+      // player1: 8♦(1) = 1 pt, highest trump = 8♦ (index 1)
       player1: [card('8', 'diamonds'), card('A', 'spades'), card('10', 'spades'), card('9', 'spades'), card('8', 'spades'), card('7', 'spades')],
+      // player2: 9♦(1) = 1 pt, highest trump = 9♦ (index 2)
       player2: [card('9', 'diamonds'), card('A', 'clubs'), card('10', 'clubs'), card('9', 'clubs'), card('8', 'clubs'), card('7', 'clubs')],
+      // player3: 10♦(1) = 1 pt, highest trump = 10♦ (index 4) — LOSER
       player3: [card('10', 'diamonds'), card('K', 'hearts'), card('K', 'spades'), card('K', 'clubs'), card('9', 'hearts'), card('9', 'spades')],
       // player4: 0 points
       player4: [card('A', 'hearts'), card('10', 'hearts'), card('K', 'hearts'), card('9', 'hearts'), card('8', 'hearts'), card('7', 'hearts')],
     });
     const result = game._scoreSchwanzer();
-    expect(result.losers).toHaveLength(4);
-    expect(result.winners).toHaveLength(1);
-    expect(result.scores.player0).toBe(-1);
-    expect(result.scores.player1).toBe(-1);
-    expect(result.scores.player2).toBe(-1);
-    expect(result.scores.player3).toBe(-1);
-    expect(result.scores.player4).toBe(4);
+    expect(result.losers).toHaveLength(1);
+    expect(result.losers).toContain('player3'); // 10♦ is highest trump among tied
+    expect(result.scores.player3).toBe(-4);
+    expect(result.scores.player0).toBe(1);
+    expect(result.scores.player1).toBe(1);
+    expect(result.scores.player2).toBe(1);
+    expect(result.scores.player4).toBe(1);
   });
 });
 
@@ -270,8 +272,9 @@ describe('Schwanzer - Zero-Sum', () => {
     expect(sumScores(result.scores)).toBe(0);
   });
 
-  test('D2: 2 losers — scores sum to zero', () => {
+  test('D2: Tiebreak case — scores sum to zero', () => {
     const game = setupSchwanzerGame({
+      // Two tied at 8 — tiebreak produces 1 loser at -4, 4 winners at +1
       player0: [card('Q', 'hearts'), card('Q', 'spades'), card('J', 'hearts'), card('A', 'hearts'), card('10', 'hearts'), card('9', 'hearts')],
       player1: [card('Q', 'clubs'), card('Q', 'diamonds'), card('J', 'spades'), card('A', 'spades'), card('10', 'spades'), card('9', 'spades')],
       player2: [card('7', 'hearts'), card('8', 'hearts'), card('K', 'hearts'), card('7', 'spades'), card('8', 'spades'), card('K', 'spades')],

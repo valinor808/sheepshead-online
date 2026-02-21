@@ -83,6 +83,11 @@ class GameUI {
   }
 
   handleGameState(state) {
+    // If trick animation is in progress, queue the state for later
+    if (this.trickAnimating) {
+      this.pendingState = state;
+      return;
+    }
     this.state = state;
     this.selectedCards = [];
     // Reset pending under call if we moved past calling phase
@@ -101,7 +106,44 @@ class GameUI {
   }
 
   handleTrickComplete(data) {
-    // Could show animation of trick being collected
+    if (!this.state) return;
+
+    const myIndex = this.state.myIndex;
+
+    // Find the winning player's position and highlight their card and box
+    const winner = this.state.players.find(p => p.id === data.winner);
+    if (winner) {
+      const relPos = (winner.seatIndex - myIndex + 5) % 5;
+      const posEl = document.getElementById(`player-pos-${relPos}`);
+
+      // Highlight winning player position
+      if (posEl) {
+        posEl.classList.add('won-trick');
+      }
+
+      // Highlight winning card in the trick
+      const playedCards = posEl?.querySelectorAll('.played-card-area .card');
+      if (playedCards && playedCards.length > 0) {
+        playedCards[playedCards.length - 1].classList.add('trick-winner');
+      }
+    }
+
+    // Set animation flag and delay clearing
+    this.trickAnimating = true;
+    setTimeout(() => {
+      // Clear animation classes
+      document.querySelectorAll('.won-trick').forEach(el => el.classList.remove('won-trick'));
+      document.querySelectorAll('.trick-winner').forEach(el => el.classList.remove('trick-winner'));
+
+      this.trickAnimating = false;
+
+      // Apply any pending state
+      if (this.pendingState) {
+        const state = this.pendingState;
+        this.pendingState = null;
+        this.handleGameState(state);
+      }
+    }, 1500);
   }
 
   handleHandComplete(results) {
@@ -139,6 +181,7 @@ class GameUI {
 
   handleRoomUpdate(data) {
     if (this.state) {
+      const existingScores = this.state.playerScores;
       // Update player list from room update
       this.state.players = data.players.map(p => ({
         ...p,
@@ -149,6 +192,7 @@ class GameUI {
         tricksWon: 0
       }));
       this.state.phase = data.phase;
+      this.state.playerScores = existingScores;
       this.render();
     }
   }
@@ -225,6 +269,24 @@ class GameUI {
     // Update header
     document.getElementById('room-name').textContent = `Table: ${this.state.roomId}`;
     document.getElementById('game-phase').textContent = this.getPhaseDisplay();
+
+    // Show/hide kibitzer leave button in header during active gameplay
+    let kibitzerLeaveBtn = document.getElementById('kibitzer-leave-btn');
+    if (this.state.isKibbitzer && this.state.phase !== 'waiting' && this.state.phase !== 'scoring') {
+      if (!kibitzerLeaveBtn) {
+        kibitzerLeaveBtn = document.createElement('button');
+        kibitzerLeaveBtn.id = 'kibitzer-leave-btn';
+        kibitzerLeaveBtn.className = 'btn danger small';
+        kibitzerLeaveBtn.textContent = 'Leave Table';
+        kibitzerLeaveBtn.addEventListener('click', () => {
+          this.socket.emit('leaveTable');
+        });
+        document.querySelector('.game-header').appendChild(kibitzerLeaveBtn);
+      }
+      kibitzerLeaveBtn.classList.remove('hidden');
+    } else if (kibitzerLeaveBtn) {
+      kibitzerLeaveBtn.classList.add('hidden');
+    }
 
     // Render based on phase
     const waitingOverlay = document.getElementById('waiting-overlay');
@@ -380,7 +442,7 @@ class GameUI {
       if (!el) continue;
 
       const isCurrentPlayer = this.state.players[this.state.currentPlayerIndex]?.id === player.id;
-      const isMe = relPos === 0;
+      const isMe = !this.state.isKibbitzer && relPos === 0;
 
       let roleText = '';
       if (player.isPicker) roleText = 'Picker';
@@ -459,11 +521,13 @@ class GameUI {
     // Get the under card ID if picker has one that hasn't been played
     const underCardId = this.state.underCardId;
     const underCardPlayed = this.state.underCardPlayed;
+    const blindCardIds = this.state.blindCardIds || [];
 
     for (const card of this.state.hand) {
       let isPlayable = false;
       let isClickable = false;
       const isUnderCard = underCardId && card.id === underCardId && !underCardPlayed;
+      const isFromBlind = this.state.phase === 'burying' && blindCardIds.includes(card.id);
 
       if (selectingUnderCard) {
         // All cards are clickable when selecting under card
@@ -480,6 +544,11 @@ class GameUI {
         playable: isPlayable,
         selected: isSelected
       });
+
+      // Mark blind cards visually during burying
+      if (isFromBlind) {
+        cardEl.classList.add('from-blind');
+      }
 
       // Mark the under card visually
       if (isUnderCard) {
@@ -571,6 +640,8 @@ class GameUI {
 
     container.classList.add('hidden');
     blindArea.classList.add('hidden');
+
+    if (this.state.isKibbitzer) return;
 
     const myPlayer = this.state.players.find(p => p.seatIndex === this.state.myIndex);
     if (!myPlayer) return;
@@ -712,12 +783,12 @@ class GameUI {
       title.textContent = 'Schwanzer!';
 
       // Determine if current player won or lost
-      const myPlayer = this.state.players.find(p => p.seatIndex === this.state.myIndex);
+      const myPlayer = !this.state.isKibbitzer ? this.state.players.find(p => p.seatIndex === this.state.myIndex) : null;
       const iWon = myPlayer && !results.losers.includes(myPlayer.id);
 
       let detailsHtml = '<p>Everyone passed</p>';
 
-      // Add personal win/loss message
+      // Add personal win/loss message (not for kibitzers)
       if (myPlayer) {
         if (numLosers === 5) {
           detailsHtml += '<p class="personal-result draw">Draw - Everyone Tied!</p>';
@@ -757,7 +828,20 @@ class GameUI {
 
       title.textContent = titleText;
 
-      let detailsHtml = `
+      let detailsHtml = '';
+
+      // Personal win/lose message (not for kibitzers)
+      if (!this.state.isKibbitzer) {
+        const myPlayer = this.state.players.find(p => p.seatIndex === this.state.myIndex);
+        if (myPlayer) {
+          const iWon = results.pickingTeam.includes(myPlayer.id) ? results.pickersWin : !results.pickersWin;
+          detailsHtml += iWon ?
+            '<p class="personal-result win">You Win!</p>' :
+            '<p class="personal-result lose">You Lost</p>';
+        }
+      }
+
+      detailsHtml += `
         <p><strong>Picker:</strong> ${picker?.name}</p>
         ${partner ? `<p><strong>Partner:</strong> ${partner.name} (${results.calledSuit} Ace)</p>` : '<p><strong>Going Alone</strong></p>'}
         <p><strong>Picking Team:</strong> ${results.pickingPoints} points (${results.pickingTeamTricks} tricks)</p>

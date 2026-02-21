@@ -93,6 +93,18 @@ class RoomManager {
   }
 
   /**
+   * Get the room a kibbitzer is in (searches all rooms)
+   */
+  getKibitzerRoom(kibitzerId) {
+    for (const [roomId, game] of this.rooms) {
+      if (game.kibbitzers.find(k => k.id === kibitzerId)) {
+        return game;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Get list of all public rooms
    */
   getPublicRooms() {

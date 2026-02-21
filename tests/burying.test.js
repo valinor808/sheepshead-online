@@ -196,6 +196,20 @@ describe('Burying - Under Card', () => {
     const result = game.bury('player0', ['A_hearts', 'A_spades']);
     expect(result.success).toBe(true);
   });
+
+  test('D3: Under call skips hold card requirement (picker has no cards in called suit)', () => {
+    // Under call: picker called clubs but has no clubs (by definition of under)
+    const hand = [
+      card('Q', 'clubs'), card('Q', 'spades'), card('J', 'clubs'), card('J', 'spades'),
+      card('A', 'hearts'), card('A', 'spades'), card('7', 'diamonds'), card('8', 'diamonds'),
+    ];
+    const game = setupBuryGame([...hand], { underCardId: '7_diamonds' });
+    game.calledSuit = 'clubs';
+    game.isUnderCall = true;
+    // Bury non-under cards - should succeed even though no clubs remain
+    const result = game.bury('player0', ['A_hearts', 'A_spades']);
+    expect(result.success).toBe(true);
+  });
 });
 
 // --- E. Successful Bury State Changes ---

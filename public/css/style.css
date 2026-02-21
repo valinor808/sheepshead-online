@@ -461,11 +461,25 @@ body {
 }
 
 
+/* Player positions use flex column for card placement toward center */
+.player-position {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Positions 0, 1, 4: card above player (toward center) */
+.player-position.pos-0 .played-card-area,
+.player-position.pos-1 .played-card-area,
+.player-position.pos-4 .played-card-area {
+  order: -1;
+}
+
 /* Played cards appear near each player */
 .played-card-area {
   display: flex;
   justify-content: center;
-  margin-top: 8px;
+  margin: 4px 0;
 }
 
 .played-card-area .card {
@@ -475,6 +489,32 @@ body {
 
 .played-card-area .card:hover {
   transform: none;
+}
+
+/* Trick winner animation */
+.trick-winner {
+  border-color: var(--accent) !important;
+  animation: trick-winner-glow 0.5s ease-in-out 3;
+}
+
+@keyframes trick-winner-glow {
+  0%, 100% { box-shadow: 0 0 8px var(--accent); }
+  50% { box-shadow: 0 0 20px var(--accent), 0 0 30px rgba(255, 215, 0, 0.5); }
+}
+
+.won-trick .player-box {
+  animation: won-trick-pulse 0.5s ease-in-out 3;
+}
+
+@keyframes won-trick-pulse {
+  0%, 100% { border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  50% { border-color: var(--accent); box-shadow: 0 0 20px var(--accent); }
+}
+
+/* Blind card highlight (during burying phase) */
+.from-blind {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4) !important;
 }
 
 /* Under card styling */
@@ -544,10 +584,11 @@ body {
 /* Game info display */
 .game-info {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 5px;
+  right: 5px;
+  z-index: 10;
   background: rgba(0,0,0,0.5);
-  padding: 10px;
+  padding: 5px 8px;
   border-radius: 5px;
   font-size: 12px;
   text-align: right;
@@ -663,6 +704,10 @@ body {
   width: 90%;
 }
 
+.last-trick-content {
+  max-width: 600px;
+}
+
 .scoring-content h2,
 .waiting-content h2,
 .last-trick-content h2 {
@@ -672,10 +717,11 @@ body {
 
 .last-trick-cards {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 15px;
   margin-bottom: 20px;
+  overflow-x: auto;
 }
 
 .last-trick-cards .trick-card {
@@ -722,7 +768,7 @@ body {
 
 #scoring-scores {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
   margin-bottom: 20px;
 }
@@ -731,11 +777,18 @@ body {
   background: rgba(0,0,0,0.3);
   padding: 10px;
   border-radius: 5px;
+  min-height: 70px;
 }
 
 .score-item .player-name {
   font-size: 12px;
   margin-bottom: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .score-item .score-value {
