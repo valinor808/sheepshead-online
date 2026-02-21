@@ -110,34 +110,56 @@ class GameUI {
 
     const myIndex = this.state.myIndex;
 
+    // Render all 5 cards from the trick data so the last card is visible
+    document.querySelectorAll('.played-card-area').forEach(el => el.remove());
+    for (const play of data.trick) {
+      const player = this.state.players.find(p => p.id === play.playerId);
+      if (!player) continue;
+
+      const relPos = (player.seatIndex - myIndex + 5) % 5;
+      const playerPosEl = document.getElementById(`player-pos-${relPos}`);
+      if (!playerPosEl) continue;
+
+      const cardWrapper = document.createElement('div');
+      cardWrapper.className = 'played-card-area';
+      cardWrapper.dataset.playerId = play.playerId;
+
+      let cardEl;
+      if (play.isUnderCard) {
+        cardEl = createCardBack({ small: true });
+        cardEl.classList.add('under-card-played');
+      } else {
+        cardEl = createCardElement(play.card, { small: true });
+      }
+      cardWrapper.appendChild(cardEl);
+      playerPosEl.appendChild(cardWrapper);
+    }
+
     // Find the winning player's position and highlight their card and box
     const winner = this.state.players.find(p => p.id === data.winner);
     if (winner) {
       const relPos = (winner.seatIndex - myIndex + 5) % 5;
       const posEl = document.getElementById(`player-pos-${relPos}`);
 
-      // Highlight winning player position
       if (posEl) {
         posEl.classList.add('won-trick');
       }
 
-      // Highlight winning card in the trick
-      const playedCards = posEl?.querySelectorAll('.played-card-area .card');
-      if (playedCards && playedCards.length > 0) {
-        playedCards[playedCards.length - 1].classList.add('trick-winner');
+      // Highlight winning card
+      const winnerCard = document.querySelector(`.played-card-area[data-player-id="${data.winner}"] .card`);
+      if (winnerCard) {
+        winnerCard.classList.add('trick-winner');
       }
     }
 
     // Set animation flag and delay clearing
     this.trickAnimating = true;
     setTimeout(() => {
-      // Clear animation classes
       document.querySelectorAll('.won-trick').forEach(el => el.classList.remove('won-trick'));
       document.querySelectorAll('.trick-winner').forEach(el => el.classList.remove('trick-winner'));
 
       this.trickAnimating = false;
 
-      // Apply any pending state
       if (this.pendingState) {
         const state = this.pendingState;
         this.pendingState = null;
@@ -773,6 +795,12 @@ class GameUI {
     // Show buttons (will be updated based on state)
     if (buttonsContainer) {
       buttonsContainer.classList.remove('hidden');
+    }
+
+    // Immediately hide "Next Hand" for kibitzers (don't wait for render cycle)
+    if (this.state && this.state.isKibbitzer) {
+      const newHandBtn = document.getElementById('new-hand-btn');
+      if (newHandBtn) newHandBtn.style.display = 'none';
     }
 
     if (results.type === 'schwanzer') {

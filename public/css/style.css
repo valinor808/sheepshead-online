@@ -461,25 +461,51 @@ body {
 }
 
 
-/* Player positions use flex column for card placement toward center */
-.player-position {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* Positions 0, 1, 4: card above player (toward center) */
-.player-position.pos-0 .played-card-area,
-.player-position.pos-1 .played-card-area,
-.player-position.pos-4 .played-card-area {
-  order: -1;
-}
-
-/* Played cards appear near each player */
+/* Played cards positioned between player and center via absolute offsets */
 .played-card-area {
+  position: absolute;
   display: flex;
   justify-content: center;
-  margin: 4px 0;
+}
+
+/* Position 0 (bottom): card above player box */
+.player-position.pos-0 .played-card-area {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+}
+
+/* Position 1 (lower-left): card to the upper-right */
+.player-position.pos-1 .played-card-area {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-20%);
+  margin-bottom: 4px;
+}
+
+/* Position 2 (upper-left): card below */
+.player-position.pos-2 .played-card-area {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+}
+
+/* Position 3 (upper-right): card below */
+.player-position.pos-3 .played-card-area {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+}
+
+/* Position 4 (lower-right): card to the upper-left */
+.player-position.pos-4 .played-card-area {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-80%);
+  margin-bottom: 4px;
 }
 
 .played-card-area .card {
@@ -585,13 +611,15 @@ body {
 .game-info {
   position: absolute;
   top: 5px;
-  right: 5px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   background: rgba(0,0,0,0.5);
-  padding: 5px 8px;
+  padding: 5px 12px;
   border-radius: 5px;
   font-size: 12px;
-  text-align: right;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .game-info div {
@@ -729,6 +757,27 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 5px;
+  min-width: 0;
+  max-width: 88px;
+}
+
+.last-trick-cards .card {
+  cursor: default;
+  transform: none;
+}
+
+.last-trick-cards .card:hover {
+  transform: none;
+}
+
+.last-trick-cards .card-owner {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 88px;
+  display: block;
+  text-align: center;
 }
 
 #show-last-trick-btn {
@@ -943,7 +992,7 @@ body {
 
   .game-info {
     font-size: 10px;
-    padding: 5px;
+    padding: 3px 8px;
   }
 }
 
